@@ -36,11 +36,30 @@ type parseTest struct {
 }
 
 var parseTests = []parseTest{
+	// strings
 	{`""`, []event{{1, StringStart}, {1, StringEnd}, {0, None}}},
 	{`"abc"`, []event{{1, StringStart}, {4, StringEnd}, {0, None}}},
+
+	// numbers
 	{`123`, []event{{1, NumberStart}, {2, None}, {0, NumberEnd}}},
+
+	// true
+	{`t`, []event{{1, BoolStart}, {0, SyntaxError}}},
+	{`tr`, []event{{1, BoolStart}, {1, None}, {0, SyntaxError}}},
+	{`tru`, []event{{1, BoolStart}, {2, None}, {0, SyntaxError}}},
 	{`true`, []event{{1, BoolStart}, {3, BoolEnd}, {0, None}}},
+
+	// false
+	{`f`, []event{{1, BoolStart}, {0, SyntaxError}}},
+	{`fa`, []event{{1, BoolStart}, {1, None}, {0, SyntaxError}}},
+	{`fal`, []event{{1, BoolStart}, {2, None}, {0, SyntaxError}}},
+	{`fals`, []event{{1, BoolStart}, {3, None}, {0, SyntaxError}}},
 	{`false`, []event{{1, BoolStart}, {4, BoolEnd}, {0, None}}},
+
+	// null
+	{`n`, []event{{1, NullStart}, {0, SyntaxError}}},
+	{`nu`, []event{{1, NullStart}, {1, None}, {0, SyntaxError}}},
+	{`nul`, []event{{1, NullStart}, {2, None}, {0, SyntaxError}}},
 	{`null`, []event{{1, NullStart}, {3, NullEnd}, {0, None}}},
 }
 
