@@ -37,8 +37,8 @@ type parseTest struct {
 
 var parseTests = []parseTest{
 	// strings
-	{`""`, []event{{1, StringStart}, {1, StringEnd}, {0, None}}},
-	{`"abc"`, []event{{1, StringStart}, {4, StringEnd}, {0, None}}},
+	{`""`, []event{{1, StringStart}, {1, StringEnd}}},
+	{`"abc"`, []event{{1, StringStart}, {4, StringEnd}}},
 
 	// numbers
 	{`123`, []event{{1, NumberStart}, {2, None}, {0, NumberEnd}}},
@@ -47,20 +47,20 @@ var parseTests = []parseTest{
 	{`t`, []event{{1, BoolStart}, {0, SyntaxError}}},
 	{`tr`, []event{{1, BoolStart}, {1, None}, {0, SyntaxError}}},
 	{`tru`, []event{{1, BoolStart}, {2, None}, {0, SyntaxError}}},
-	{`true`, []event{{1, BoolStart}, {3, BoolEnd}, {0, None}}},
+	{`true`, []event{{1, BoolStart}, {3, BoolEnd}}},
 
 	// false
 	{`f`, []event{{1, BoolStart}, {0, SyntaxError}}},
 	{`fa`, []event{{1, BoolStart}, {1, None}, {0, SyntaxError}}},
 	{`fal`, []event{{1, BoolStart}, {2, None}, {0, SyntaxError}}},
 	{`fals`, []event{{1, BoolStart}, {3, None}, {0, SyntaxError}}},
-	{`false`, []event{{1, BoolStart}, {4, BoolEnd}, {0, None}}},
+	{`false`, []event{{1, BoolStart}, {4, BoolEnd}}},
 
 	// null
 	{`n`, []event{{1, NullStart}, {0, SyntaxError}}},
 	{`nu`, []event{{1, NullStart}, {1, None}, {0, SyntaxError}}},
 	{`nul`, []event{{1, NullStart}, {2, None}, {0, SyntaxError}}},
-	{`null`, []event{{1, NullStart}, {3, NullEnd}, {0, None}}},
+	{`null`, []event{{1, NullStart}, {3, NullEnd}}},
 }
 
 func TestParsing(t *testing.T) {
@@ -80,16 +80,14 @@ func TestParsing(t *testing.T) {
 			var where int
 			var what Event
 
-			// the final event is special -- it must be triggered
-			// by Parser.Eof()
-			if i < len(test.events)-1 {
+			if len(input) - pos == 0 {
+				log = append(log, "  .Eof()")
+				where, what = 0, p.Eof()
+			} else {
 				line := fmt.Sprintf("  .Parse(%#q)", input[pos:])
 				log = append(log, line)
 
 				where, what = p.Parse(input[pos:])
-			} else {
-				log = append(log, "  .Eof()")
-				where, what = 0, p.Eof()
 			}
 
 			if where != event.where || what != event.what {
