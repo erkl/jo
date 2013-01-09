@@ -20,12 +20,12 @@ const (
 const (
 	_StateValue = iota
 
-	_StateStringUnicode  // \u
-	_StateStringUnicode2 // \u1
-	_StateStringUnicode3 // \u12
-	_StateStringUnicode4 // \u123
+	_StateStringUnicode  // "\u
+	_StateStringUnicode2 // "\u1
+	_StateStringUnicode3 // "\u12
+	_StateStringUnicode4 // "\u123
 	_StateString         // "
-	_StateStringEscaped  // \
+	_StateStringEscaped  // "\
 
 	_StateTrue  // t
 	_StateTrue2 // tr
