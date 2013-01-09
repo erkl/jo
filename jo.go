@@ -4,16 +4,17 @@ package jo
 type Event int
 
 const (
-	Continue = iota
+	None = iota
+	SyntaxError
 
 	StringStart
 	StringEnd
+	NumberStart
+	NumberEnd
 	BoolStart
 	BoolEnd
 	NullStart
 	NullEnd
-
-	SyntaxError
 )
 
 // Parser states.
@@ -26,6 +27,15 @@ const (
 	_StateStringUnicode4 // "\u123
 	_StateString         // "
 	_StateStringEscaped  // "\
+
+	_StateNumberNegative           // -
+	_StateNumberZero               // 0
+	_StateNumber                   // 123
+	_StateNumberDotFirstDigit      // 123.
+	_StateNumberDotDigit           // 123.4
+	_StateNumberExponentSign       // 123e
+	_StateNumberExponentFirstDigit // 123e+
+	_StateNumberExponentDigit      // 123e+1
 
 	_StateTrue  // t
 	_StateTrue2 // tr
@@ -64,17 +74,26 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 	for i, b := range input {
 		switch p.state {
 		case _StateValue:
-			switch b {
-			case '"':
+			switch {
+			case b == '"':
 				p.state = _StateString
 				return i + 1, StringStart
-			case 't':
+			case b == '-':
+				p.state = _StateNumberNegative
+				return i + 1, NumberStart
+			case b == '0':
+				p.state = _StateNumberZero
+				return i + 1, NumberStart
+			case '1' <= b && b <= '9':
+				p.state = _StateNumber
+				return i + 1, NumberStart
+			case b == 't':
 				p.state = _StateTrue
 				return i + 1, BoolStart
-			case 'f':
+			case b == 'f':
 				p.state = _StateFalse
 				return i + 1, BoolStart
-			case 'n':
+			case b == 'n':
 				p.state = _StateNull
 				return i + 1, NullStart
 			default:
@@ -112,6 +131,65 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 				p.state = _StateStringUnicode
 			default:
 				return i, p.error(`_StateStringEscaped: @todo`)
+			}
+
+		case _StateNumberNegative:
+			switch {
+			case b == '0':
+				p.state = _StateNumberZero
+			case '1' <= b && b <= '9':
+				p.state = _StateNumber
+			default:
+				return i, p.error(`_StateNumberNegative: @todo`)
+			}
+
+		case _StateNumber:
+			if '0' <= b && b <= '9' {
+				break
+			}
+			fallthrough
+
+		case _StateNumberZero:
+			switch b {
+			case '.':
+				p.state = _StateNumberDotFirstDigit
+			case 'e', 'E':
+				p.state = _StateNumberExponentSign
+			default:
+				return i, p.error(`_StateNumberZero: @todo`)
+			}
+
+		case _StateNumberDotFirstDigit:
+			if b < '0' || b > '9' {
+				return i, p.error(`_StateNumberDot: @todo`)
+			}
+			p.state++
+
+		case _StateNumberDotDigit:
+			switch {
+			case b == 'e', b == 'E':
+				p.state = _StateNumberExponentSign
+			case b < '0' || b > '9':
+				return i, p.error(`_StateNumberDotDigit: @todo`)
+			}
+
+		case _StateNumberExponentSign:
+			p.state++
+			if b == '+' || b == '-' {
+				break
+			}
+			fallthrough
+
+		case _StateNumberExponentFirstDigit:
+			if b < '0' || b > '9' {
+				return i, p.error(`_StateNumberAfterExponent: @todo`)
+			}
+			p.state++
+
+		case _StateNumberExponentDigit:
+			if b < '0' || b > '9' {
+				p.state = p.next()
+				return i + 1, NumberEnd
 			}
 
 		case _StateTrue:
@@ -188,7 +266,24 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 		}
 	}
 
-	return len(input) - 1, Continue
+	return len(input), None
+}
+
+// Informs the parser not to expect any further input. Returns
+// pending NumberEnd events if there are any, or a SyntaxError
+// if EOF was not expected -- otherwise None.
+func (p *Parser) Eof() Event {
+	switch p.state {
+	case _StateNumberZero,
+		_StateNumber,
+		_StateNumberDotDigit,
+		_StateNumberExponentDigit:
+		p.state = _StateDone
+		return NumberEnd
+	case _StateDone:
+		return None
+	}
+	return p.error(`.Eof(): @todo`)
 }
 
 // Pops the next state off the parser struct's queue.
