@@ -7,6 +7,10 @@ const (
 	None = iota
 	SyntaxError
 
+	ObjectStart
+	ObjectEnd
+	KeyStart
+	KeyEnd
 	ArrayStart
 	ArrayEnd
 
@@ -24,6 +28,11 @@ const (
 const (
 	_StateValue = iota
 
+	_StateObjectKeyOrEnd    // {
+	_StateObjectKeyEndEvent // {"foo"
+	_StateObjectColon       // {"foo"
+	_StateObjectCommaOrEnd  // {"foo":"bar"
+
 	_StateArrayValueOrEnd // [
 	_StateArrayCommaOrEnd // ["any value"
 	_StateArrayValue      // ["any value",
@@ -34,6 +43,7 @@ const (
 	_StateStringUnicode4 // "\u123
 	_StateString         // "
 	_StateStringEscaped  // "\
+	_StateStringEndEvent // return a string event
 
 	_StateNumberNegative           // -
 	_StateNumberZero               // 0
@@ -84,10 +94,14 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 		switch p.state {
 		case _StateValue:
 			switch {
+			case b == '{':
+				p.state = _StateObjectKeyOrEnd
+				return i + 1, ObjectStart
 			case b == '[':
 				p.state = _StateArrayValueOrEnd
 				return i + 1, ArrayStart
 			case b == '"':
+				p.push(_StateStringEndEvent)
 				p.state = _StateString
 				return i + 1, StringStart
 			case b == '-':
@@ -111,6 +125,48 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 			default:
 				return i, p.error(`_StateValue: @todo`)
 			}
+
+		case _StateObjectKeyOrEnd:
+			if b == '}' {
+				p.state = p.next()
+				return i + 1, ObjectEnd
+			}
+			if b != '"' {
+				return i, p.error(`_StateObjectKeyOrEnd: @todo`)
+			}
+
+			p.push(_StateObjectKeyEndEvent)
+			p.state = _StateString
+
+			return i + 1, KeyStart
+
+		case _StateObjectKeyEndEvent:
+			p.state = _StateObjectColon
+			return i + 1, KeyEnd
+
+		case _StateObjectColon:
+			if b != ':' {
+				return i, p.error(`_StateObjectKeyOrEnd: @todo`)
+			}
+
+			p.push(_StateObjectCommaOrEnd)
+			p.state = _StateValue
+
+		case _StateObjectCommaOrEnd:
+			switch b {
+			case '}':
+				p.state = p.next()
+				return i + 1, ObjectEnd
+			case ',':
+				p.push(_StateObjectCommaOrEnd)
+				p.state = _StateValue
+			default:
+				return i, p.error(`_StateObjectCommaOrEnd: @todo`)
+			}
+
+		case _StateStringEndEvent:
+			p.state = p.next()
+			return i + 1, StringEnd
 
 		case _StateArrayValueOrEnd:
 			if b == ']' {
@@ -150,7 +206,7 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 			switch {
 			case b == '"':
 				p.state = p.next()
-				return i + 1, StringEnd
+				i-- // rewind
 			case b == '\\':
 				p.state = _StateStringEscaped
 			case b < 0x20:
