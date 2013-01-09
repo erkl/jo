@@ -190,7 +190,8 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 			case 'e', 'E':
 				p.state = _StateNumberExponentSign
 			default:
-				return i, p.error(`_StateNumberZero: @todo`)
+				p.state = p.next()
+				return i, NumberEnd // rewind (note: `i` instead of `i + 1`)
 			}
 
 		case _StateNumberDotFirstDigit:
@@ -329,7 +330,7 @@ func (p *Parser) next() int {
 		return _StateDone
 	}
 
-	state := p.queue[length]
+	state := p.queue[length-1]
 	p.queue = p.queue[:length-1]
 
 	return state
