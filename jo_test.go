@@ -30,12 +30,12 @@ type event struct {
 	what  Event
 }
 
-type test struct {
+type parseTest struct {
 	json   string
 	events []event
 }
 
-var tests = []test{
+var parseTests = []parseTest{
 	{`""`, []event{{1, StringStart}, {1, StringEnd}, {0, None}}},
 	{`"abc"`, []event{{1, StringStart}, {4, StringEnd}, {0, None}}},
 	{`123`, []event{{1, NumberStart}, {2, None}, {0, NumberEnd}}},
@@ -44,44 +44,48 @@ var tests = []test{
 	{`null`, []event{{1, NullStart}, {3, NullEnd}, {0, None}}},
 }
 
-func TestEverything(t *testing.T) {
-	for _, test := range tests {
-		p := Parser{}
-
+func TestParsing(t *testing.T) {
+	for _, test := range parseTests {
 		input := []byte(test.json)
 		pos := 0
 
-		// only save log output for this particular test
+		// instantiate a new Parser and reset the log output
+		// before each test
+		p := Parser{}
 		log := []string{"p := Parser{}"}
 
-		// run through all expected events
+		// evaluate all expected events
 		for i := 0; i < len(test.events); i++ {
 			event := test.events[i]
 
-			var n int
-			var e Event
+			var where int
+			var what Event
 
-			// the last event must come from `p.Eof()
-			if i == len(test.events)-1 {
-				log = append(log, "  .Eof()")
-				n, e = 0, p.Eof()
+			// the final event is special -- it must be triggered
+			// by Parser.Eof()
+			if i < len(test.events)-1 {
+				line := fmt.Sprintf("  .Parse(%#q)", input[pos:])
+				log = append(log, line)
+
+				where, what = p.Parse(input[pos:])
 			} else {
-				log = append(log, fmt.Sprintf("  .Parse(%#q)", input[pos:]))
-				n, e = p.Parse(input[pos:])
+				log = append(log, "  .Eof()")
+				where, what = 0, p.Eof()
 			}
 
-			// are we happy with the outcome?
-			if n != event.where || e != event.what {
+			if where != event.where || what != event.what {
+				// dump the log output we've accumulated
 				for _, line := range log {
 					t.Logf(line)
 				}
 
 				t.Fatalf("want %s at index %d, got %s at index %d",
-					reverse[event.what], event.where, reverse[e], n)
+					reverse[event.what], event.where, reverse[what], where)
 			}
 
-			// skip the consumed bytes
-			pos += n
+			// skip the bytes consumed during the last call
+			// to parser.Parse()
+			pos += where
 		}
 	}
 }
