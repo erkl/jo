@@ -7,6 +7,9 @@ const (
 	None = iota
 	SyntaxError
 
+	ArrayStart
+	ArrayEnd
+
 	StringStart
 	StringEnd
 	NumberStart
@@ -20,6 +23,10 @@ const (
 // Parser states.
 const (
 	_StateValue = iota
+
+	_StateArrayValueOrEnd // [
+	_StateArrayCommaOrEnd // ["any value"
+	_StateArrayValue      // ["any value",
 
 	_StateStringUnicode  // "\u
 	_StateStringUnicode2 // "\u1
@@ -71,10 +78,15 @@ type Parser struct {
 // Parses a byte slice containing JSON data. Returns the number of bytes
 // read and an appropriate Event.
 func (p *Parser) Parse(input []byte) (int, Event) {
-	for i, b := range input {
+	for i := 0; i < len(input); i++ {
+		b := input[i]
+
 		switch p.state {
 		case _StateValue:
 			switch {
+			case b == '[':
+				p.state = _StateArrayValueOrEnd
+				return i + 1, ArrayStart
 			case b == '"':
 				p.state = _StateString
 				return i + 1, StringStart
@@ -98,6 +110,28 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 				return i + 1, NullStart
 			default:
 				return i, p.error(`_StateValue: @todo`)
+			}
+
+		case _StateArrayValueOrEnd:
+			if b == ']' {
+				p.state = p.next()
+				return i + 1, ArrayEnd
+			}
+
+			p.push(_StateArrayCommaOrEnd)
+			p.state = _StateValue
+			i-- // rewind and let _StateValue do the parsing
+
+		case _StateArrayCommaOrEnd:
+			switch b {
+			case ']':
+				p.state = p.next()
+				return i + 1, ArrayEnd
+			case ',':
+				p.push(_StateArrayCommaOrEnd)
+				p.state = _StateValue
+			default:
+				return i, p.error(`_StateArrayCommaOrEnd: @todo`)
 			}
 
 		case _StateStringUnicode, _StateStringUnicode2,
