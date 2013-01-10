@@ -91,7 +91,7 @@ func TestParsing(t *testing.T) {
 			var where int
 			var what Event
 
-			if len(input) - pos == 0 {
+			if len(input)-pos == 0 {
 				log = append(log, "  .Eof()")
 				where, what = 0, p.Eof()
 			} else {
