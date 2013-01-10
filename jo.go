@@ -27,6 +27,7 @@ const (
 // Parser states.
 const (
 	_StateValue = iota
+	_StateDone
 
 	_StateObjectKeyOrEnd   // {
 	_StateObjectColon      // {"foo"
@@ -35,6 +36,10 @@ const (
 	_StateArrayValueOrEnd // [
 	_StateArrayCommaOrEnd // ["any value"
 	_StateArrayValue      // ["any value",
+
+	// leading whitespace should be consumed from all states
+	// above this line
+	_AllowWhitespace
 
 	_StateStringUnicode  // "\u
 	_StateStringUnicode2 // "\u1
@@ -72,7 +77,6 @@ const (
 	_StateNull2 // nu
 	_StateNull3 // nul
 
-	_StateDone
 	_StateSyntaxError
 )
 
@@ -95,6 +99,12 @@ type Parser struct {
 func (p *Parser) Parse(input []byte) (int, Event) {
 	for i := 0; i < len(input); i++ {
 		b := input[i]
+
+		// optionally trim leading whitespace
+		if p.state < _AllowWhitespace &&
+			(b == ' ' || b == '\t' || b == '\n' || b == '\r') {
+			continue
+		}
 
 		switch p.state {
 		case _StateValue:
