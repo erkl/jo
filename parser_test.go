@@ -66,6 +66,190 @@ var illegalLiterals = []parseTest{
 	{`NULL`, []event{{0, SyntaxError}}},
 }
 
+var legalObjects = []parseTest{
+	{
+		`{}`,
+		[]event{
+			{1, ObjectStart},
+			{1, ObjectEnd},
+			{0, None},
+		},
+	},
+	{
+		`{"foo":"bar"}`,
+		[]event{
+			{1, ObjectStart},
+			{1, KeyStart},
+			{4, KeyEnd},
+			{2, StringStart},
+			{4, StringEnd},
+			{1, ObjectEnd},
+			{0, None},
+		},
+	},
+	{
+		`{"1":1,"2":2}`,
+		[]event{
+			{1, ObjectStart},
+			{1, KeyStart},
+			{2, KeyEnd},
+			{2, NumberStart},
+			{0, NumberEnd},
+			{2, KeyStart},
+			{2, KeyEnd},
+			{2, NumberStart},
+			{0, NumberEnd},
+			{1, ObjectEnd},
+			{0, None},
+		},
+	},
+	{
+		`{"\u1234\t\n\b\u8BbF\"":0}`,
+		[]event{
+			{1, ObjectStart},
+			{1, KeyStart},
+			{21, KeyEnd},
+			{2, NumberStart},
+			{0, NumberEnd},
+			{1, ObjectEnd},
+			{0, None},
+		},
+	},
+	{
+		`{"{":"}"}`,
+		[]event{
+			{1, ObjectStart},
+			{1, KeyStart},
+			{2, KeyEnd},
+			{2, StringStart},
+			{2, StringEnd},
+			{1, ObjectEnd},
+			{0, None},
+		},
+	},
+	{
+		`{"foo":{"bar":{"baz":{}}}}`,
+		[]event{
+			{1, ObjectStart},
+			{1, KeyStart},
+			{4, KeyEnd},
+			{2, ObjectStart},
+			{1, KeyStart},
+			{4, KeyEnd},
+			{2, ObjectStart},
+			{1, KeyStart},
+			{4, KeyEnd},
+			{2, ObjectStart},
+			{1, ObjectEnd},
+			{1, ObjectEnd},
+			{1, ObjectEnd},
+			{1, ObjectEnd},
+			{0, None},
+		},
+	},
+	{
+		`{"true":true,"false":false,"null":null}`,
+		[]event{
+			{1, ObjectStart},
+			{1, KeyStart},
+			{5, KeyEnd},
+			{2, BoolStart},
+			{3, BoolEnd},
+			{2, KeyStart},
+			{6, KeyEnd},
+			{2, BoolStart},
+			{4, BoolEnd},
+			{2, KeyStart},
+			{5, KeyEnd},
+			{2, NullStart},
+			{3, NullEnd},
+			{1, ObjectEnd},
+			{0, None},
+		},
+	},
+}
+
+var illegalObjects = []parseTest{
+	{
+		`{0:1}`,
+		[]event{
+			{1, ObjectStart},
+			{0, SyntaxError},
+		},
+	},
+	{
+		`{"foo":"bar"`,
+		[]event{
+			{1, ObjectStart},
+			{1, KeyStart},
+			{4, KeyEnd},
+			{2, StringStart},
+			{4, StringEnd},
+			{0, SyntaxError},
+		},
+	},
+	{
+		`{{`,
+		[]event{
+			{1, ObjectStart},
+			{0, SyntaxError},
+		},
+	},
+	{
+		`{"a":1,}`,
+		[]event{
+			{1, ObjectStart},
+			{1, KeyStart},
+			{2, KeyEnd},
+			{2, NumberStart},
+			{0, NumberEnd},
+			{1, SyntaxError},
+		},
+	},
+	{
+		`{"a":1,,`,
+		[]event{
+			{1, ObjectStart},
+			{1, KeyStart},
+			{2, KeyEnd},
+			{2, NumberStart},
+			{0, NumberEnd},
+			{1, SyntaxError},
+		},
+	},
+	{
+		`{"a"}`,
+		[]event{
+			{1, ObjectStart},
+			{1, KeyStart},
+			{2, KeyEnd},
+			{0, SyntaxError},
+		},
+	},
+	{
+		`{"a":"1}`,
+		[]event{
+			{1, ObjectStart},
+			{1, KeyStart},
+			{2, KeyEnd},
+			{2, StringStart},
+			{2, None},
+			{0, SyntaxError},
+		},
+	},
+	{
+		`{"a":1"b":2}`,
+		[]event{
+			{1, ObjectStart},
+			{1, KeyStart},
+			{2, KeyEnd},
+			{2, NumberStart},
+			{0, NumberEnd},
+			{0, SyntaxError},
+		},
+	},
+}
+
 var legalWhitespace = []parseTest{
 	{` 17`, []event{{2, NumberStart}, {1, None}, {0, NumberEnd}}},
 	{`38 `, []event{{1, NumberStart}, {1, NumberEnd}, {1, None}, {0, None}}},
@@ -77,7 +261,9 @@ var legalWhitespace = []parseTest{
 func TestParsing(t *testing.T) {
 	tests := make([]parseTest, 0)
 	tests = append(tests, legalLiterals...)
+	tests = append(tests, legalObjects...)
 	tests = append(tests, illegalLiterals...)
+	tests = append(tests, illegalObjects...)
 	tests = append(tests, legalWhitespace...)
 
 	for _, test := range tests {
