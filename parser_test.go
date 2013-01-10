@@ -360,6 +360,54 @@ var legalWhitespace = []parseTest{
 	{`  " what ? "  `, []event{{3, StringStart}, {9, StringEnd}, {2, None}, {0, None}}},
 	{"\nnull", []event{{2, NullStart}, {3, NullEnd}, {0, None}}},
 	{"\n\r\t true \r\n\t", []event{{5, BoolStart}, {3, BoolEnd}, {4, None}, {0, None}}},
+
+	{
+		" { \"foo\": \t\"bar\" } ",
+		[]event{
+			{2, ObjectStart},
+			{2, KeyStart},
+			{4, KeyEnd},
+			{4, StringStart},
+			{4, StringEnd},
+			{2, ObjectEnd},
+			{1, None},
+		},
+	},
+	{
+		"\t[ 1 , 2\r, 3\n]",
+		[]event{
+			{2, ArrayStart},
+			{2, NumberStart},
+			{0, NumberEnd},
+			{4, NumberStart},
+			{0, NumberEnd},
+			{4, NumberStart},
+			{0, NumberEnd},
+			{2, ArrayEnd},
+			{0, None},
+		},
+	},
+	{
+		" \n{ \t\"foo\" : [ \"bar\", null ], \"what\\n\"\t: 10.3e1 } ",
+		[]event{
+			{3, ObjectStart},
+			{3, KeyStart},
+			{4, KeyEnd},
+			{4, ArrayStart},
+			{2, StringStart},
+			{4, StringEnd},
+			{3, NullStart},
+			{3, NullEnd},
+			{2, ArrayEnd},
+			{3, KeyStart},
+			{7, KeyEnd},
+			{4, NumberStart},
+			{5, NumberEnd},
+			{2, ObjectEnd},
+			{1, None},
+			{0, None},
+		},
+	},
 }
 
 func TestParsing(t *testing.T) {
