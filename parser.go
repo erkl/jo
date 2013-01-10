@@ -7,6 +7,7 @@ const (
 	_StateObjectKeyOrEnd   // {
 	_StateObjectColon      // {"foo"
 	_StateObjectCommaOrEnd // {"foo":"bar"
+	_StateObjectKey        // {"foo":"bar",
 
 	_StateArrayValueOrEnd // [
 	_StateArrayCommaOrEnd // ["any value"
@@ -120,10 +121,14 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 				p.state = p.next()
 				return i + 1, ObjectEnd
 			}
-			if b != '"' {
-				return i, p.error(`_StateObjectKeyOrEnd: @todo`)
-			}
 
+			p.state = _StateObjectKey
+			i-- // rewind
+
+		case _StateObjectKey:
+			if b != '"' {
+				return i, p.error(`_StateObjectKey: @todo`)
+			}
 			p.state = _StateKey
 			return i + 1, KeyStart
 
@@ -141,8 +146,7 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 				p.state = p.next()
 				return i + 1, ObjectEnd
 			case ',':
-				p.push(_StateObjectCommaOrEnd)
-				p.state = _StateValue
+				p.state = _StateObjectKey
 			default:
 				return i, p.error(`_StateObjectCommaOrEnd: @todo`)
 			}
@@ -207,7 +211,7 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 			case 'b', 'f', 'n', 'r', 't', '\\', '/', '"':
 				p.state-- // back to _State{String,Key}
 			case 'u':
-				p.state = _StateStringUnicode
+				p.state -= 5 // go to _State{String,Key}Unicode
 			default:
 				return i, p.error(`_StateStringEscaped: @todo`)
 			}
