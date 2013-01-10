@@ -28,10 +28,9 @@ const (
 const (
 	_StateValue = iota
 
-	_StateObjectKeyOrEnd    // {
-	_StateObjectKeyEndEvent // {"foo"
-	_StateObjectColon       // {"foo"
-	_StateObjectCommaOrEnd  // {"foo":"bar"
+	_StateObjectKeyOrEnd   // {
+	_StateObjectColon      // {"foo"
+	_StateObjectCommaOrEnd // {"foo":"bar"
 
 	_StateArrayValueOrEnd // [
 	_StateArrayCommaOrEnd // ["any value"
@@ -43,7 +42,13 @@ const (
 	_StateStringUnicode4 // "\u123
 	_StateString         // "
 	_StateStringEscaped  // "\
-	_StateStringEndEvent // return a string event
+
+	_StateKeyUnicode  // "\u
+	_StateKeyUnicode2 // "\u1
+	_StateKeyUnicode3 // "\u12
+	_StateKeyUnicode4 // "\u123
+	_StateKey         // "
+	_StateKeyEscaped  // "\
 
 	_StateNumberNegative           // -
 	_StateNumberZero               // 0
@@ -101,7 +106,6 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 				p.state = _StateArrayValueOrEnd
 				return i + 1, ArrayStart
 			case b == '"':
-				p.push(_StateStringEndEvent)
 				p.state = _StateString
 				return i + 1, StringStart
 			case b == '-':
@@ -135,14 +139,8 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 				return i, p.error(`_StateObjectKeyOrEnd: @todo`)
 			}
 
-			p.push(_StateObjectKeyEndEvent)
-			p.state = _StateString
-
+			p.state = _StateKey
 			return i + 1, KeyStart
-
-		case _StateObjectKeyEndEvent:
-			p.state = _StateObjectColon
-			return i + 1, KeyEnd
 
 		case _StateObjectColon:
 			if b != ':' {
@@ -163,10 +161,6 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 			default:
 				return i, p.error(`_StateObjectCommaOrEnd: @todo`)
 			}
-
-		case _StateStringEndEvent:
-			p.state = p.next()
-			return i + 1, StringEnd
 
 		case _StateArrayValueOrEnd:
 			if b == ']' {
@@ -190,8 +184,10 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 				return i, p.error(`_StateArrayCommaOrEnd: @todo`)
 			}
 
-		case _StateStringUnicode, _StateStringUnicode2,
-			_StateStringUnicode3, _StateStringUnicode4:
+		case _StateStringUnicode, _StateKeyUnicode,
+			_StateStringUnicode2, _StateKeyUnicode2,
+			_StateStringUnicode3, _StateKeyUnicode3,
+			_StateStringUnicode4, _StateKeyUnicode4:
 			switch {
 			case '0' <= b && b <= '9':
 			case 'a' <= b && b <= 'f':
@@ -200,23 +196,31 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 				return i, p.error(`_StateStringUnicodeX: @todo`)
 			}
 
-			p.state++ // note that `_StateString == (_StateStringUnicode4 + 1)`
+			// note that _State{String,Key}Unicode4 + 1 == _State{String/Key}
+			p.state++
 
-		case _StateString:
+		case _StateString, _StateKey:
 			switch {
 			case b == '"':
-				p.state = p.next()
-				i-- // rewind
+				var ev Event
+				if p.state == _StateKey {
+					ev = KeyEnd
+					p.state = _StateObjectColon
+				} else {
+					ev = StringEnd
+					p.state = p.next()
+				}
+				return i + 1, ev
 			case b == '\\':
-				p.state = _StateStringEscaped
+				p.state++ // go to _State{String,Key}Escaped
 			case b < 0x20:
 				return i, p.error(`_StateString: @todo`)
 			}
 
-		case _StateStringEscaped:
+		case _StateStringEscaped, _StateKeyEscaped:
 			switch b {
 			case 'b', 'f', 'n', 'r', 't', '\\', '/', '"':
-				p.state = _StateString
+				p.state-- // back to _State{String,Key}
 			case 'u':
 				p.state = _StateStringUnicode
 			default:
