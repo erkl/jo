@@ -5,26 +5,6 @@ import (
 	"testing"
 )
 
-// reverse lookups of event names
-var reverse = map[Event]string{
-	None:        "None",
-	SyntaxError: "SyntaxError",
-	ObjectStart: "ObjectStart",
-	ObjectEnd:   "ObjectEnd",
-	KeyStart:    "KeyStart",
-	KeyEnd:      "KeyEnd",
-	ArrayStart:  "ArrayStart",
-	ArrayEnd:    "ArrayEnd",
-	StringStart: "StringStart",
-	StringEnd:   "StringEnd",
-	NumberStart: "NumberStart",
-	NumberEnd:   "NumberEnd",
-	BoolStart:   "BoolStart",
-	BoolEnd:     "BoolEnd",
-	NullStart:   "NullStart",
-	NullEnd:     "NullEnd",
-}
-
 type event struct {
 	where int
 	what  Event
@@ -133,7 +113,7 @@ func TestParsing(t *testing.T) {
 				}
 
 				t.Fatalf("want %s at index %d, got %s at index %d",
-					reverse[event.what], event.where, reverse[what], where)
+					event.what, event.where, what, where)
 			}
 
 			// skip the bytes consumed during the last call

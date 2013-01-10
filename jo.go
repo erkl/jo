@@ -1,30 +1,5 @@
 package jo
 
-// Parsing events.
-type Event int
-
-const (
-	None = iota
-	SyntaxError
-
-	ObjectStart
-	ObjectEnd
-	KeyStart
-	KeyEnd
-	ArrayStart
-	ArrayEnd
-
-	StringStart
-	StringEnd
-	NumberStart
-	NumberEnd
-	BoolStart
-	BoolEnd
-	NullStart
-	NullEnd
-)
-
-// Parser states.
 const (
 	_StateValue = iota
 	_StateDone
