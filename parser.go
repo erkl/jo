@@ -254,7 +254,8 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 			case b == 'e', b == 'E':
 				p.state = _StateNumberExpSign
 			case b < '0' || b > '9':
-				return i, p.error(`_StateNumberDotDigit: @todo`)
+				p.state = p.next()
+				return i, NumberEnd // rewind (note: `i` instead of `i + 1`)
 			}
 
 		case _StateNumberExpSign:

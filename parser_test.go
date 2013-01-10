@@ -50,7 +50,7 @@ var illegalLiterals = []parseTest{
 
 	{`-`, []event{{1, NumberStart}, {0, SyntaxError}}},
 	{`0.`, []event{{1, NumberStart}, {1, None}, {0, SyntaxError}}},
-	{`123.456.789`, []event{{1, NumberStart}, {6, SyntaxError}}},
+	{`123.456.789`, []event{{1, NumberStart}, {6, NumberEnd}, {0, SyntaxError}}},
 	{`10e`, []event{{1, NumberStart}, {2, None}, {0, SyntaxError}}},
 	{`10e+`, []event{{1, NumberStart}, {3, None}, {0, SyntaxError}}},
 	{`10e-`, []event{{1, NumberStart}, {3, None}, {0, SyntaxError}}},
@@ -334,6 +334,16 @@ var illegalArrays = []parseTest{
 		[]event{
 			{1, ArrayStart},
 			{0, SyntaxError},
+		},
+	},
+	{
+		`[10.3]`,
+		[]event{
+			{1, ArrayStart},
+			{1, NumberStart},
+			{3, NumberEnd},
+			{1, ArrayEnd},
+			{0, None},
 		},
 	},
 	{
