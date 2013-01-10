@@ -360,12 +360,12 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 		}
 	}
 
-	return len(input), None
+	return len(input), Continue
 }
 
-// Informs the parser not to expect any further input. Returns
-// pending NumberEnd events if there are any, or a SyntaxError
-// if EOF was not expected -- otherwise None.
+// Informs the parser not to expect any further input. Returns pending
+// NumberEnd events if there are any, or a SyntaxError event if EOF was
+// not expected -- otherwise Done.
 func (p *Parser) Eof() Event {
 	switch p.state {
 	case _StateNumberZero,
@@ -375,7 +375,7 @@ func (p *Parser) Eof() Event {
 		p.state = _StateDone
 		return NumberEnd
 	case _StateDone:
-		return None
+		return Done
 	}
 	return p.error(`.Eof(): @todo`)
 }

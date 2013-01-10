@@ -1,8 +1,8 @@
 package jo
 
 const (
-	None = iota
-	SyntaxError
+	Continue = iota
+	Done
 
 	ObjectStart
 	ObjectEnd
@@ -19,13 +19,15 @@ const (
 	BoolEnd
 	NullStart
 	NullEnd
+
+	SyntaxError
 )
 
 type Event int
 
 var names = map[Event]string{
-	None:        "None",
-	SyntaxError: "SyntaxError",
+	Continue:    "Continue",
+	Done:        "Done",
 	ObjectStart: "ObjectStart",
 	ObjectEnd:   "ObjectEnd",
 	KeyStart:    "KeyStart",
@@ -40,6 +42,7 @@ var names = map[Event]string{
 	BoolEnd:     "BoolEnd",
 	NullStart:   "NullStart",
 	NullEnd:     "NullEnd",
+	SyntaxError: "SyntaxError",
 }
 
 func (e Event) String() string {
