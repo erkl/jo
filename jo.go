@@ -50,14 +50,14 @@ const (
 	_StateKey         // "
 	_StateKeyEscaped  // "\
 
-	_StateNumberNegative           // -
-	_StateNumberZero               // 0
-	_StateNumber                   // 123
-	_StateNumberDotFirstDigit      // 123.
-	_StateNumberDotDigit           // 123.4
-	_StateNumberExponentSign       // 123e
-	_StateNumberExponentFirstDigit // 123e+
-	_StateNumberExponentDigit      // 123e+1
+	_StateNumberNegative      // -
+	_StateNumberZero          // 0
+	_StateNumber              // 123
+	_StateNumberDotFirstDigit // 123.
+	_StateNumberDotDigit      // 123.4
+	_StateNumberExpSign       // 123e
+	_StateNumberExpFirstDigit // 123e+
+	_StateNumberExpDigit      // 123e+1
 
 	_StateTrue  // t
 	_StateTrue2 // tr
@@ -248,7 +248,7 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 			case '.':
 				p.state = _StateNumberDotFirstDigit
 			case 'e', 'E':
-				p.state = _StateNumberExponentSign
+				p.state = _StateNumberExpSign
 			default:
 				p.state = p.next()
 				return i, NumberEnd // rewind (note: `i` instead of `i + 1`)
@@ -263,25 +263,25 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 		case _StateNumberDotDigit:
 			switch {
 			case b == 'e', b == 'E':
-				p.state = _StateNumberExponentSign
+				p.state = _StateNumberExpSign
 			case b < '0' || b > '9':
 				return i, p.error(`_StateNumberDotDigit: @todo`)
 			}
 
-		case _StateNumberExponentSign:
+		case _StateNumberExpSign:
 			p.state++
 			if b == '+' || b == '-' {
 				break
 			}
 			fallthrough
 
-		case _StateNumberExponentFirstDigit:
+		case _StateNumberExpFirstDigit:
 			if b < '0' || b > '9' {
-				return i, p.error(`_StateNumberAfterExponent: @todo`)
+				return i, p.error(`_StateNumberAfterExp: @todo`)
 			}
 			p.state++
 
-		case _StateNumberExponentDigit:
+		case _StateNumberExpDigit:
 			if b < '0' || b > '9' {
 				p.state = p.next()
 				return i + 1, NumberEnd
@@ -372,7 +372,7 @@ func (p *Parser) Eof() Event {
 	case _StateNumberZero,
 		_StateNumber,
 		_StateNumberDotDigit,
-		_StateNumberExponentDigit:
+		_StateNumberExpDigit:
 		p.state = _StateDone
 		return NumberEnd
 	case _StateDone:
