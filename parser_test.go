@@ -310,6 +310,16 @@ var legalArrays = []parseTest{
 		},
 	},
 	{
+		`[10.3]`,
+		[]event{
+			{1, ArrayStart},
+			{1, NumberStart},
+			{3, NumberEnd},
+			{1, ArrayEnd},
+			{0, None},
+		},
+	},
+	{
 		`["][\"]"]`,
 		[]event{
 			{1, ArrayStart},
@@ -334,16 +344,6 @@ var illegalArrays = []parseTest{
 		[]event{
 			{1, ArrayStart},
 			{0, SyntaxError},
-		},
-	},
-	{
-		`[10.3]`,
-		[]event{
-			{1, ArrayStart},
-			{1, NumberStart},
-			{3, NumberEnd},
-			{1, ArrayEnd},
-			{0, None},
 		},
 	},
 	{
