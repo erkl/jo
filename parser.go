@@ -56,6 +56,13 @@ const (
 	_StateSyntaxError
 )
 
+// Parser state machine.
+type Parser struct {
+	state int
+	queue []int
+	err   error
+}
+
 // Our own little implementation of the `error` interface.
 type syntaxError string
 
@@ -63,11 +70,9 @@ func (e syntaxError) Error() string {
 	return string(e)
 }
 
-// Parser state machine.
-type Parser struct {
-	state int
-	queue []int
-	err   error
+// Returns the syntax error stored in the parser, if any.
+func (p *Parser) LastError() error {
+	return p.err
 }
 
 // Parses a byte slice containing JSON data. Returns the number of bytes
@@ -113,7 +118,7 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 				p.state = _StateNull
 				return i + 1, NullStart
 			default:
-				return i, p.error(`_StateValue: @todo`)
+				return i, p.error(`expected JSON value`)
 			}
 
 		case _StateObjectKeyOrEnd:
@@ -127,14 +132,14 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 
 		case _StateObjectKey:
 			if b != '"' {
-				return i, p.error(`_StateObjectKey: @todo`)
+				return i, p.error(`expected object key`)
 			}
 			p.state = _StateKey
 			return i + 1, KeyStart
 
 		case _StateObjectColon:
 			if b != ':' {
-				return i, p.error(`_StateObjectKeyOrEnd: @todo`)
+				return i, p.error(`expected ':' after object key`)
 			}
 
 			p.push(_StateObjectCommaOrEnd)
@@ -148,7 +153,7 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 			case ',':
 				p.state = _StateObjectKey
 			default:
-				return i, p.error(`_StateObjectCommaOrEnd: @todo`)
+				return i, p.error(`expected ',' or '}' after object value`)
 			}
 
 		case _StateArrayValueOrEnd:
@@ -170,7 +175,7 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 				p.push(_StateArrayCommaOrEnd)
 				p.state = _StateValue
 			default:
-				return i, p.error(`_StateArrayCommaOrEnd: @todo`)
+				return i, p.error(`expected ',' or ']' after array value`)
 			}
 
 		case _StateStringUnicode, _StateKeyUnicode,
@@ -182,7 +187,7 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 			case 'a' <= b && b <= 'f':
 			case 'A' <= b && b <= 'F':
 			default:
-				return i, p.error(`_StateStringUnicodeX: @todo`)
+				return i, p.error(`expected four hexadecimal characters after "\u" in string`)
 			}
 
 			// note that _State{String,Key}Unicode4 + 1 == _State{String/Key}
@@ -203,7 +208,11 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 			case b == '\\':
 				p.state++ // go to _State{String,Key}Escaped
 			case b < 0x20:
-				return i, p.error(`_StateString: @todo`)
+				if p.state == _StateKey {
+					return i, p.error(`expected valid code point in key`)
+				} else {
+					return i, p.error(`expected valid code point in string`)
+				}
 			}
 
 		case _StateStringEscaped, _StateKeyEscaped:
@@ -213,7 +222,7 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 			case 'u':
 				p.state -= 5 // go to _State{String,Key}Unicode
 			default:
-				return i, p.error(`_StateStringEscaped: @todo`)
+				return i, p.error(`expected valid escape sequence after '\'`)
 			}
 
 		case _StateNumberNegative:
@@ -223,7 +232,7 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 			case '1' <= b && b <= '9':
 				p.state = _StateNumber
 			default:
-				return i, p.error(`_StateNumberNegative: @todo`)
+				return i, p.error(`digit after '-'`)
 			}
 
 		case _StateNumber:
@@ -245,7 +254,7 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 
 		case _StateNumberDotFirstDigit:
 			if b < '0' || b > '9' {
-				return i, p.error(`_StateNumberDot: @todo`)
+				return i, p.error(`expected digit after dot in number`)
 			}
 			p.state++
 
@@ -267,7 +276,7 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 
 		case _StateNumberExpFirstDigit:
 			if b < '0' || b > '9' {
-				return i, p.error(`_StateNumberAfterExp: @todo`)
+				return i, p.error(`expected digit after exponent in number`)
 			}
 			p.state++
 
@@ -279,19 +288,19 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 
 		case _StateTrue:
 			if b != 'r' {
-				return i, p.error(`_StateTrue: @todo`)
+				return i, p.error(`expected 'r' in literal true`)
 			}
 			p.state++
 
 		case _StateTrue2:
 			if b != 'u' {
-				return i, p.error(`_StateTrue2: @todo`)
+				return i, p.error(`expected 'u' in literal true`)
 			}
 			p.state++
 
 		case _StateTrue3:
 			if b != 'e' {
-				return i, p.error(`_StateTrue3: @todo`)
+				return i, p.error(`expected 'e' in literal true`)
 			}
 			p.state = p.next()
 
@@ -299,25 +308,25 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 
 		case _StateFalse:
 			if b != 'a' {
-				return i, p.error(`_StateFalse: @todo`)
+				return i, p.error(`expected 'a' in literal false`)
 			}
 			p.state++
 
 		case _StateFalse2:
 			if b != 'l' {
-				return i, p.error(`_StateFalse2: @todo`)
+				return i, p.error(`expected 'l' in literal false`)
 			}
 			p.state++
 
 		case _StateFalse3:
 			if b != 's' {
-				return i, p.error(`_StateFalse3: @todo`)
+				return i, p.error(`expected 's' in literal false`)
 			}
 			p.state++
 
 		case _StateFalse4:
 			if b != 'e' {
-				return i, p.error(`_StateFalse4: @todo`)
+				return i, p.error(`expected 'e' in literal false`)
 			}
 			p.state = p.next()
 
@@ -325,26 +334,26 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 
 		case _StateNull:
 			if b != 'u' {
-				return i, p.error(`_StateNull: @todo`)
+				return i, p.error(`expected 'u' in literal null`)
 			}
 			p.state++
 
 		case _StateNull2:
 			if b != 'l' {
-				return i, p.error(`_StateNull2: @todo`)
+				return i, p.error(`expected 'l' in literal null`)
 			}
 			p.state++
 
 		case _StateNull3:
 			if b != 'l' {
-				return i, p.error(`_StateNull3: @todo`)
+				return i, p.error(`expected 'l' in literal null`)
 			}
 			p.state = p.next()
 
 			return i + 1, NullEnd
 
 		case _StateDone:
-			return i, p.error(`_StateDone: @todo`)
+			return i, p.error(`expected nothing after top-level value`)
 
 		default:
 			panic(`invalid state`)
