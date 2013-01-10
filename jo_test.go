@@ -86,10 +86,19 @@ var invalidPrimitives = []parseTest{
 	{`NULL`, []event{{0, SyntaxError}}},
 }
 
+var whitespaceTests = []parseTest{
+	{` 17`, []event{{2, NumberStart}, {1, None}, {0, NumberEnd}}},
+	{`38 `, []event{{1, NumberStart}, {1, NumberEnd}, {1, None}, {0, None}}},
+	{`  " what ? "  `, []event{{3, StringStart}, {9, StringEnd}, {2, None}, {0, None}}},
+	{"\nnull", []event{{2, NullStart}, {3, NullEnd}, {0, None}}},
+	{"\n\r\t true \r\n\t", []event{{5, BoolStart}, {3, BoolEnd}, {4, None}, {0, None}}},
+}
+
 func TestParsing(t *testing.T) {
 	tests := make([]parseTest, 0)
 	tests = append(tests, validPrimitives...)
 	tests = append(tests, invalidPrimitives...)
+	tests = append(tests, whitespaceTests...)
 
 	for _, test := range tests {
 		input := []byte(test.json)
