@@ -75,6 +75,7 @@ func (p *Parser) LastError() error {
 // read and an appropriate Event.
 func (p *Parser) Parse(input []byte) (int, Event) {
 	for i := 0; i < len(input); i++ {
+		var event Event = Continue
 		var b byte = input[i]
 
 		if p.state < _IgnoreSpace && isSpace(b) {
@@ -83,260 +84,284 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 
 		switch p.state {
 		case _StateValue:
-			switch {
-			case b == '{':
+			if b == '{' {
+				event = ObjectStart
 				p.state = _StateObjectKeyOrBrace
-				return i + 1, ObjectStart
-			case b == '[':
+			} else if b == '[' {
+				event = ArrayStart
 				p.state = _StateArrayValueOrBracket
-				return i + 1, ArrayStart
-			case b == '"':
+			} else if b == '"' {
+				event = StringStart
 				p.state = _StateString
-				return i + 1, StringStart
-			case b == '-':
+			} else if b == '-' {
+				event = NumberStart
 				p.state = _StateNumberNegative
-				return i + 1, NumberStart
-			case b == '0':
+			} else if b == '0' {
+				event = NumberStart
 				p.state = _StateNumberZero
-				return i + 1, NumberStart
-			case '1' <= b && b <= '9':
+			} else if '1' <= b && b <= '9' {
+				event = NumberStart
 				p.state = _StateNumber
-				return i + 1, NumberStart
-			case b == 't':
+			} else if b == 't' {
+				event = BoolStart
 				p.state = _StateTrue
-				return i + 1, BoolStart
-			case b == 'f':
+			} else if b == 'f' {
+				event = BoolStart
 				p.state = _StateFalse
-				return i + 1, BoolStart
-			case b == 'n':
+			} else if b == 'n' {
+				event = NullStart
 				p.state = _StateNull
-				return i + 1, NullStart
-			default:
-				return i, p.error(`expected beginning of JSON value`)
+			} else {
+				event = p.error(`expecting beginning of JSON value`)
 			}
 
 		case _StateObjectKeyOrBrace:
 			if b == '}' {
+				event = ObjectEnd
 				p.state = p.next()
-				return i + 1, ObjectEnd
+				break
 			}
 
+			// if it's not a brace, it must be a key
 			p.state = _StateObjectKey
-			i-- // rewind
+			fallthrough
 
 		case _StateObjectKey:
-			if b != '"' {
-				return i, p.error(`expected object key`)
+			if b == '"' {
+				event = KeyStart
+				p.state = _StateKey
+			} else {
+				event = p.error(`expected object key`)
 			}
-			p.state = _StateKey
-			return i + 1, KeyStart
 
 		case _StateObjectColon:
-			if b != ':' {
-				return i, p.error(`expected ':' after object key`)
+			if b == ':' {
+				p.state = _StateValue
+				p.push(_StateObjectCommaOrBrace)
+			} else {
+				event = p.error(`expected ':' after object key`)
 			}
 
-			p.push(_StateObjectCommaOrBrace)
-			p.state = _StateValue
-
 		case _StateObjectCommaOrBrace:
-			switch b {
-			case '}':
-				p.state = p.next()
-				return i + 1, ObjectEnd
-			case ',':
+			if b == ',' {
 				p.state = _StateObjectKey
-			default:
-				return i, p.error(`expected ',' or '}' after object value`)
+			} else if b == '}' {
+				event = ObjectEnd
+				p.state = p.next()
+			} else {
+				event = p.error(`expected ',' or '}' after object value`)
 			}
 
 		case _StateArrayValueOrBracket:
 			if b == ']' {
+				event = ArrayEnd
 				p.state = p.next()
-				return i + 1, ArrayEnd
+			} else {
+				p.state = _StateValue
+				p.push(_StateArrayCommaOrBracket)
+
+				// rewind and let _StateValue parse this byte for us
+				i--
 			}
 
-			p.push(_StateArrayCommaOrBracket)
-			p.state = _StateValue
-			i-- // rewind and let _StateValue do the parsing
-
 		case _StateArrayCommaOrBracket:
-			switch b {
-			case ']':
-				p.state = p.next()
-				return i + 1, ArrayEnd
-			case ',':
-				p.push(_StateArrayCommaOrBracket)
+			if b == ',' {
 				p.state = _StateValue
-			default:
-				return i, p.error(`expected ',' or ']' after array value`)
+				p.push(_StateArrayCommaOrBracket)
+			} else if b == ']' {
+				event = ArrayEnd
+				p.state = p.next()
+			} else {
+				event = p.error(`expected ',' or ']' after array value`)
 			}
 
 		case _StateStringUnicode, _StateKeyUnicode,
 			_StateStringUnicode2, _StateKeyUnicode2,
 			_StateStringUnicode3, _StateKeyUnicode3,
 			_StateStringUnicode4, _StateKeyUnicode4:
-			if !isHex(b) {
-				return i, p.error(`expected four hexadecimal chars after "\u"`)
+			if isHex(b) {
+				// move on to the next unicode byte state, or back to
+				// `_State{String/Key}` if this was the fourth hexadecimal
+				// character after "\u"
+				p.state++
+			} else {
+				event = p.error(`expected four hexadecimal chars after "\u"`)
 			}
 
-			// note that _State{String,Key}Unicode4 + 1 == _State{String/Key}
-			p.state++
-
 		case _StateString, _StateKey:
-			switch {
-			case b == '"':
-				var ev Event
+			if b == '"' {
 				if p.state == _StateKey {
-					ev = KeyEnd
+					event = KeyEnd
 					p.state = _StateObjectColon
 				} else {
-					ev = StringEnd
+					event = StringEnd
 					p.state = p.next()
 				}
-				return i + 1, ev
-			case b == '\\':
-				p.state++ // go to _State{String,Key}Escaped
-			case b < 0x20:
-				return i, p.error(`expected valid string character`)
+			} else if b == '\\' {
+				// continue with `_State{String,Key}Escaped`
+				p.state++
+			} else if b < 0x20 {
+				event = p.error(`expected valid string character`)
 			}
 
 		case _StateStringEscaped, _StateKeyEscaped:
 			switch b {
 			case 'b', 'f', 'n', 'r', 't', '\\', '/', '"':
-				p.state-- // back to _State{String,Key}
+				// jump back to _State{String,Key}
+				p.state--
 			case 'u':
-				p.state -= 5 // go to _State{String,Key}Unicode
+				// continue to `_State{String,Key}Unicode`
+				p.state -= 5
 			default:
-				return i, p.error(`expected valid escape sequence after '\'`)
+				event = p.error(`expected valid escape sequence after '\'`)
 			}
 
 		case _StateNumberNegative:
-			switch {
-			case b == '0':
+			if b == '0' {
 				p.state = _StateNumberZero
-			case '1' <= b && b <= '9':
+			} else if '1' <= b && b <= '9' {
 				p.state = _StateNumber
-			default:
-				return i, p.error(`digit after '-'`)
+			} else {
+				event = p.error(`digit after '-'`)
 			}
 
 		case _StateNumber:
-			if '0' <= b && b <= '9' {
+			if isDigit(b) {
 				break
 			}
+
+			// the same limits apply here as in _StateNumberZero
 			fallthrough
 
 		case _StateNumberZero:
-			switch b {
-			case '.':
+			if b == '.' {
 				p.state = _StateNumberDotFirstDigit
-			case 'e', 'E':
+			} else if b == 'e' || b == 'E' {
 				p.state = _StateNumberExpSign
-			default:
+			} else {
+				event = NumberEnd
 				p.state = p.next()
-				return i, NumberEnd // rewind (note: `i` instead of `i + 1`)
+
+				// rewind a byte, because the character we encountered was
+				// not part of the number
+				i--
 			}
 
 		case _StateNumberDotFirstDigit:
-			if b < '0' || b > '9' {
-				return i, p.error(`expected digit after dot in number`)
+			if isDigit(b) {
+				p.state = _StateNumberDotDigit
+			} else {
+				event = p.error(`expected digit after dot in number`)
 			}
-			p.state++
 
 		case _StateNumberDotDigit:
-			switch {
-			case b == 'e', b == 'E':
+			if b == 'e' || b == 'E' {
 				p.state = _StateNumberExpSign
-			case b < '0' || b > '9':
+			} else if !isDigit(b) {
+				event = NumberEnd
 				p.state = p.next()
-				return i, NumberEnd // rewind (note: `i` instead of `i + 1`)
+
+				// rewind a byte, because the character we encountered was
+				// not part of the number
+				i--
 			}
 
 		case _StateNumberExpSign:
-			p.state++
+			p.state = _StateNumberExpFirstDigit
 			if b == '+' || b == '-' {
 				break
 			}
 			fallthrough
 
 		case _StateNumberExpFirstDigit:
-			if b < '0' || b > '9' {
-				return i, p.error(`expected digit after exponent in number`)
+			if !isDigit(b) {
+				event = p.error(`expected digit after exponent in number`)
+			} else {
+				p.state++
 			}
-			p.state++
 
 		case _StateNumberExpDigit:
-			if b < '0' || b > '9' {
+			if !isDigit(b) {
+				event = NumberEnd
 				p.state = p.next()
-				return i, NumberEnd
+
+				// rewind a byte, because the character we encountered was
+				// not part of the number
+				i--
 			}
 
 		case _StateTrue:
-			if b != 'r' {
-				return i, p.error(`expected 'r' in literal true`)
+			if b == 'r' {
+				p.state = _StateTrue2
+			} else {
+				event = p.error(`expected 'r' in literal true`)
 			}
-			p.state++
 
 		case _StateTrue2:
-			if b != 'u' {
+			if b == 'u' {
+				p.state = _StateTrue3
+			} else {
 				return i, p.error(`expected 'u' in literal true`)
 			}
-			p.state++
 
 		case _StateTrue3:
-			if b != 'e' {
+			if b == 'e' {
+				event = BoolEnd
+				p.state = p.next()
+			} else {
 				return i, p.error(`expected 'e' in literal true`)
 			}
-			p.state = p.next()
-
-			return i + 1, BoolEnd
 
 		case _StateFalse:
-			if b != 'a' {
-				return i, p.error(`expected 'a' in literal false`)
+			if b == 'a' {
+				p.state = _StateFalse2
+			} else {
+				event = p.error(`expected 'a' in literal false`)
 			}
-			p.state++
 
 		case _StateFalse2:
-			if b != 'l' {
-				return i, p.error(`expected 'l' in literal false`)
+			if b == 'l' {
+				p.state = _StateFalse3
+			} else {
+				event = p.error(`expected 'l' in literal false`)
 			}
-			p.state++
 
 		case _StateFalse3:
-			if b != 's' {
-				return i, p.error(`expected 's' in literal false`)
+			if b == 's' {
+				p.state = _StateFalse4
+			} else {
+				event = p.error(`expected 's' in literal false`)
 			}
-			p.state++
 
 		case _StateFalse4:
-			if b != 'e' {
-				return i, p.error(`expected 'e' in literal false`)
+			if b == 'e' {
+				event = BoolEnd
+				p.state = p.next()
+			} else {
+				event = p.error(`expected 'e' in literal false`)
 			}
-			p.state = p.next()
-
-			return i + 1, BoolEnd
 
 		case _StateNull:
-			if b != 'u' {
-				return i, p.error(`expected 'u' in literal null`)
+			if b == 'u' {
+				p.state = _StateNull2
+			} else {
+				event = p.error(`expected 'u' in literal false`)
 			}
-			p.state++
 
 		case _StateNull2:
-			if b != 'l' {
-				return i, p.error(`expected 'l' in literal null`)
+			if b == 'l' {
+				p.state = _StateNull3
+			} else {
+				event = p.error(`expected 'l' in literal false`)
 			}
-			p.state++
 
 		case _StateNull3:
-			if b != 'l' {
-				return i, p.error(`expected 'l' in literal null`)
+			if b == 'l' {
+				event = NullEnd
+				p.state = p.next()
+			} else {
+				event = p.error(`expected 'l' in literal false`)
 			}
-			p.state = p.next()
-
-			return i + 1, NullEnd
 
 		case _StateDone:
 			return i, p.error(`expected nothing after top-level value`)
@@ -344,13 +369,22 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 		default:
 			panic(`invalid state`)
 		}
+
+		if event == SyntaxError {
+			// don't consume the byte that caused the error
+			return i, SyntaxError
+		}
+
+		if event != Continue {
+			return i + 1, event
+		}
 	}
 
 	return len(input), Continue
 }
 
-// Informs the parser not to expect any further input. Returns pending
-// NumberEnd events if there are any, or a SyntaxError event if EOF was
+// Informs the parser not to expect any further input. Will return pending
+// NumberEnd events (if there are any), or a SyntaxError event if EOF was
 // not expected -- otherwise Done.
 func (p *Parser) Eof() Event {
 	switch p.state {
@@ -397,6 +431,9 @@ func isSpace(b byte) bool {
 }
 
 func isHex(b byte) bool {
-	return ('0' <= b && b <= '9') || ('a' <= b && b <= 'f') ||
-		('A' <= b && b <= 'F')
+	return isDigit(b) || ('a' <= b && b <= 'f') || ('A' <= b && b <= 'F')
+}
+
+func isDigit(b byte) bool {
+	return '0' <= b && b <= '9'
 }
