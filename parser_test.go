@@ -250,6 +250,110 @@ var illegalObjects = []parseTest{
 	},
 }
 
+var legalArrays = []parseTest{
+	{
+		`[]`,
+		[]event{
+			{1, ArrayStart},
+			{1, ArrayEnd},
+			{0, None},
+		},
+	},
+	{
+		`[1]`,
+		[]event{
+			{1, ArrayStart},
+			{1, NumberStart},
+			{0, NumberEnd},
+			{1, ArrayEnd},
+		},
+	},
+	{
+		`[1,2,3]`,
+		[]event{
+			{1, ArrayStart},
+			{1, NumberStart},
+			{0, NumberEnd},
+			{2, NumberStart},
+			{0, NumberEnd},
+			{2, NumberStart},
+			{0, NumberEnd},
+			{1, ArrayEnd},
+		},
+	},
+	{
+		`["dude","what"]`,
+		[]event{
+			{1, ArrayStart},
+			{1, StringStart},
+			{5, StringEnd},
+			{2, StringStart},
+			{5, StringEnd},
+			{1, ArrayEnd},
+			{0, None},
+		},
+	},
+	{
+		`[[[],[]],[]]`,
+		[]event{
+			{1, ArrayStart},
+			{1, ArrayStart},
+			{1, ArrayStart},
+			{1, ArrayEnd},
+			{2, ArrayStart},
+			{1, ArrayEnd},
+			{1, ArrayEnd},
+			{2, ArrayStart},
+			{1, ArrayEnd},
+			{1, ArrayEnd},
+			{0, None},
+		},
+	},
+	{
+		`["][\"]"]`,
+		[]event{
+			{1, ArrayStart},
+			{1, StringStart},
+			{6, StringEnd},
+			{1, ArrayEnd},
+			{0, None},
+		},
+	},
+}
+
+var illegalArrays = []parseTest{
+	{
+		`[`,
+		[]event{
+			{1, ArrayStart},
+			{0, SyntaxError},
+		},
+	},
+	{
+		`[,]`,
+		[]event{
+			{1, ArrayStart},
+			{0, SyntaxError},
+		},
+	},
+	{
+		`[10,]`,
+		[]event{
+			{1, ArrayStart},
+			{1, NumberStart},
+			{1, NumberEnd},
+			{1, SyntaxError},
+		},
+	},
+	{
+		`[}`,
+		[]event{
+			{1, ArrayStart},
+			{0, SyntaxError},
+		},
+	},
+}
+
 var legalWhitespace = []parseTest{
 	{` 17`, []event{{2, NumberStart}, {1, None}, {0, NumberEnd}}},
 	{`38 `, []event{{1, NumberStart}, {1, NumberEnd}, {1, None}, {0, None}}},
@@ -262,8 +366,10 @@ func TestParsing(t *testing.T) {
 	tests := make([]parseTest, 0)
 	tests = append(tests, legalLiterals...)
 	tests = append(tests, legalObjects...)
+	tests = append(tests, legalArrays...)
 	tests = append(tests, illegalLiterals...)
 	tests = append(tests, illegalObjects...)
+	tests = append(tests, illegalArrays...)
 	tests = append(tests, legalWhitespace...)
 
 	for _, test := range tests {
