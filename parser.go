@@ -4,18 +4,16 @@ const (
 	_StateValue = iota
 	_StateDone
 
-	_StateObjectKeyOrEnd   // {
-	_StateObjectColon      // {"foo"
-	_StateObjectCommaOrEnd // {"foo":"bar"
-	_StateObjectKey        // {"foo":"bar",
+	_StateObjectKeyOrBrace   // {
+	_StateObjectColon        // {"foo"
+	_StateObjectCommaOrBrace // {"foo":"bar"
+	_StateObjectKey          // {"foo":"bar",
 
-	_StateArrayValueOrEnd // [
-	_StateArrayCommaOrEnd // ["any value"
-	_StateArrayValue      // ["any value",
+	_StateArrayValueOrBracket // [
+	_StateArrayCommaOrBracket // ["any value"
 
-	// leading whitespace should be consumed from all states
-	// above this line
-	_AllowWhitespace
+	// leading spaces must be be consumed from all states listed above
+	_IgnoreSpace
 
 	_StateStringUnicode  // "\u
 	_StateStringUnicode2 // "\u1
@@ -52,8 +50,6 @@ const (
 	_StateNull  // n
 	_StateNull2 // nu
 	_StateNull3 // nul
-
-	_StateSyntaxError
 )
 
 // Parser state machine.
@@ -64,9 +60,9 @@ type Parser struct {
 }
 
 // Our own little implementation of the `error` interface.
-type syntaxError string
+type err string
 
-func (e syntaxError) Error() string {
+func (e err) Error() string {
 	return string(e)
 }
 
@@ -79,11 +75,9 @@ func (p *Parser) LastError() error {
 // read and an appropriate Event.
 func (p *Parser) Parse(input []byte) (int, Event) {
 	for i := 0; i < len(input); i++ {
-		b := input[i]
+		var b byte = input[i]
 
-		// optionally trim leading whitespace
-		if p.state < _AllowWhitespace &&
-			(b == ' ' || b == '\t' || b == '\n' || b == '\r') {
+		if p.state < _IgnoreSpace && isSpace(b) {
 			continue
 		}
 
@@ -91,10 +85,10 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 		case _StateValue:
 			switch {
 			case b == '{':
-				p.state = _StateObjectKeyOrEnd
+				p.state = _StateObjectKeyOrBrace
 				return i + 1, ObjectStart
 			case b == '[':
-				p.state = _StateArrayValueOrEnd
+				p.state = _StateArrayValueOrBracket
 				return i + 1, ArrayStart
 			case b == '"':
 				p.state = _StateString
@@ -118,10 +112,10 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 				p.state = _StateNull
 				return i + 1, NullStart
 			default:
-				return i, p.error(`expected JSON value`)
+				return i, p.error(`expected beginning of JSON value`)
 			}
 
-		case _StateObjectKeyOrEnd:
+		case _StateObjectKeyOrBrace:
 			if b == '}' {
 				p.state = p.next()
 				return i + 1, ObjectEnd
@@ -142,10 +136,10 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 				return i, p.error(`expected ':' after object key`)
 			}
 
-			p.push(_StateObjectCommaOrEnd)
+			p.push(_StateObjectCommaOrBrace)
 			p.state = _StateValue
 
-		case _StateObjectCommaOrEnd:
+		case _StateObjectCommaOrBrace:
 			switch b {
 			case '}':
 				p.state = p.next()
@@ -156,23 +150,23 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 				return i, p.error(`expected ',' or '}' after object value`)
 			}
 
-		case _StateArrayValueOrEnd:
+		case _StateArrayValueOrBracket:
 			if b == ']' {
 				p.state = p.next()
 				return i + 1, ArrayEnd
 			}
 
-			p.push(_StateArrayCommaOrEnd)
+			p.push(_StateArrayCommaOrBracket)
 			p.state = _StateValue
 			i-- // rewind and let _StateValue do the parsing
 
-		case _StateArrayCommaOrEnd:
+		case _StateArrayCommaOrBracket:
 			switch b {
 			case ']':
 				p.state = p.next()
 				return i + 1, ArrayEnd
 			case ',':
-				p.push(_StateArrayCommaOrEnd)
+				p.push(_StateArrayCommaOrBracket)
 				p.state = _StateValue
 			default:
 				return i, p.error(`expected ',' or ']' after array value`)
@@ -182,12 +176,8 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 			_StateStringUnicode2, _StateKeyUnicode2,
 			_StateStringUnicode3, _StateKeyUnicode3,
 			_StateStringUnicode4, _StateKeyUnicode4:
-			switch {
-			case '0' <= b && b <= '9':
-			case 'a' <= b && b <= 'f':
-			case 'A' <= b && b <= 'F':
-			default:
-				return i, p.error(`expected four hexadecimal characters after "\u" in string`)
+			if !isHex(b) {
+				return i, p.error(`expected four hexadecimal chars after "\u"`)
 			}
 
 			// note that _State{String,Key}Unicode4 + 1 == _State{String/Key}
@@ -208,11 +198,7 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 			case b == '\\':
 				p.state++ // go to _State{String,Key}Escaped
 			case b < 0x20:
-				if p.state == _StateKey {
-					return i, p.error(`expected valid code point in key`)
-				} else {
-					return i, p.error(`expected valid code point in string`)
-				}
+				return i, p.error(`expected valid string character`)
 			}
 
 		case _StateStringEscaped, _StateKeyEscaped:
@@ -402,6 +388,15 @@ func (p *Parser) push(state int) {
 
 // Registers a syntax error. Always returns a SyntaxError event.
 func (p *Parser) error(message string) Event {
-	p.err = syntaxError(message)
+	p.err = err(message)
 	return SyntaxError
+}
+
+func isSpace(b byte) bool {
+	return b == ' ' || b == '\t' || b == '\n' || b == '\r'
+}
+
+func isHex(b byte) bool {
+	return ('0' <= b && b <= '9') || ('a' <= b && b <= 'f') ||
+		('A' <= b && b <= 'F')
 }
