@@ -12,7 +12,8 @@ const (
 	_StateArrayValueOrBracket // [
 	_StateArrayCommaOrBracket // ["any value"
 
-	// leading spaces must be be consumed from all states listed above
+	// leading whitespace must be be consumed before any of the above
+	// states are processed
 	_IgnoreSpace
 
 	_StateStringUnicode  // "\u
