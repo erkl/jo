@@ -294,7 +294,7 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 		case _StateNumberExpDigit:
 			if b < '0' || b > '9' {
 				p.state = p.next()
-				return i + 1, NumberEnd
+				return i, NumberEnd
 			}
 
 		case _StateTrue:
