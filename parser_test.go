@@ -15,7 +15,7 @@ type parseTest struct {
 	events []event
 }
 
-var validPrimitives = []parseTest{
+var legalLiterals = []parseTest{
 	{`""`, []event{{1, StringStart}, {1, StringEnd}}},
 	{`"abc"`, []event{{1, StringStart}, {4, StringEnd}}},
 	{`"\u8bA0"`, []event{{1, StringStart}, {7, StringEnd}}},
@@ -40,7 +40,7 @@ var validPrimitives = []parseTest{
 	{`null`, []event{{1, NullStart}, {3, NullEnd}}},
 }
 
-var invalidPrimitives = []parseTest{
+var illegalLiterals = []parseTest{
 	{`"`, []event{{1, StringStart}, {0, SyntaxError}}},
 	{`"foo`, []event{{1, StringStart}, {3, None}, {0, SyntaxError}}},
 	{`'single'`, []event{{0, SyntaxError}}},
@@ -66,7 +66,7 @@ var invalidPrimitives = []parseTest{
 	{`NULL`, []event{{0, SyntaxError}}},
 }
 
-var whitespaceTests = []parseTest{
+var legalWhitespace = []parseTest{
 	{` 17`, []event{{2, NumberStart}, {1, None}, {0, NumberEnd}}},
 	{`38 `, []event{{1, NumberStart}, {1, NumberEnd}, {1, None}, {0, None}}},
 	{`  " what ? "  `, []event{{3, StringStart}, {9, StringEnd}, {2, None}, {0, None}}},
@@ -76,9 +76,9 @@ var whitespaceTests = []parseTest{
 
 func TestParsing(t *testing.T) {
 	tests := make([]parseTest, 0)
-	tests = append(tests, validPrimitives...)
-	tests = append(tests, invalidPrimitives...)
-	tests = append(tests, whitespaceTests...)
+	tests = append(tests, legalLiterals...)
+	tests = append(tests, illegalLiterals...)
+	tests = append(tests, legalWhitespace...)
 
 	for _, test := range tests {
 		input := []byte(test.json)

@@ -45,7 +45,7 @@ var names = map[Event]string{
 func (e Event) String() string {
 	name, ok := names[e]
 	if !ok {
-		return "INVALID_EVENT"
+		return "INVALID"
 	}
 
 	return name
