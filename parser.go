@@ -227,7 +227,7 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 			}
 
 		case _StateNumber:
-			if isDigit(b) {
+			if isDecimal(b) {
 				break
 			}
 
@@ -249,7 +249,7 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 			}
 
 		case _StateNumberDotFirstDigit:
-			if isDigit(b) {
+			if isDecimal(b) {
 				p.state = _StateNumberDotDigit
 			} else {
 				event = p.error(`expected digit after dot in number`)
@@ -258,7 +258,7 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 		case _StateNumberDotDigit:
 			if b == 'e' || b == 'E' {
 				p.state = _StateNumberExpSign
-			} else if !isDigit(b) {
+			} else if !isDecimal(b) {
 				event = NumberEnd
 				p.state = p.next()
 
@@ -275,14 +275,14 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 			fallthrough
 
 		case _StateNumberExpFirstDigit:
-			if !isDigit(b) {
+			if !isDecimal(b) {
 				event = p.error(`expected digit after exponent in number`)
 			} else {
 				p.state++
 			}
 
 		case _StateNumberExpDigit:
-			if !isDigit(b) {
+			if !isDecimal(b) {
 				event = NumberEnd
 				p.state = p.next()
 
@@ -432,9 +432,9 @@ func isSpace(b byte) bool {
 }
 
 func isHex(b byte) bool {
-	return isDigit(b) || ('a' <= b && b <= 'f') || ('A' <= b && b <= 'F')
+	return isDecimal(b) || ('a' <= b && b <= 'f') || ('A' <= b && b <= 'F')
 }
 
-func isDigit(b byte) bool {
+func isDecimal(b byte) bool {
 	return '0' <= b && b <= '9'
 }
