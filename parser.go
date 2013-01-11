@@ -57,8 +57,12 @@ const (
 type Parser struct {
 	state int
 	queue []int
-	depth int
 	err   error
+
+	depth      int
+	escape     bool
+	escapeNext int
+	escapeLast int
 }
 
 // Parses a byte slice containing JSON data. Returns the number of bytes
@@ -370,9 +374,20 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 			return i, SyntaxError
 		}
 
-		if event != Continue {
-			return i + 1, event
+		// if this byte didn't yield an event, try the next
+		if event == Continue {
+			continue
 		}
+
+		if p.escape && p.depth >= p.escapeNext {
+			if p.depth == p.escapeNext {
+				p.escapeNext--
+			} else {
+				continue
+			}
+		}
+
+		return i + 1, event
 	}
 
 	return len(input), Continue
@@ -412,6 +427,25 @@ func (p *Parser) LastError() error {
 // Returns the current depth of nested objects and arrays.
 func (p *Parser) Depth() int {
 	return p.depth
+}
+
+// When invoked, Parse() will only return Continue, SyntaxError, ObjectEnd or
+// ArrayEnd events until the object or array `depth` levels up has been fully
+// parsed.
+//
+//   input := []byte(`[{"foo":"bar"}]`
+//   p := Parser{}
+//   p.Parse(input[0:])  // -> (1, ArrayStart)
+//   p.Parse(input[1:])  // -> (1, ObjectStart)
+//   p.Escape(1)         // we don't care about what's in this object
+//   p.Parse(input[2:])  // -> (12, ObjectEnd)
+//
+// In the above example, we avoided the KeyStart, KeyEnd, StringStart and
+// StringEnd events that normally would have followed the ObjectStart event.
+func (p *Parser) Escape(depth int) {
+	p.escape = true
+	p.escapeNext = p.depth - 1
+	p.escapeLast = p.depth - depth
 }
 
 // Convenience function for saving a syntax error.
