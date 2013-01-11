@@ -420,20 +420,21 @@ var legalWhitespace = []parseTest{
 	},
 }
 
+var all = []parseTest{}
+
+func init() {
+	// Build the list of all tests cases.
+	all = append(all, legalLiterals...)
+	all = append(all, legalObjects...)
+	all = append(all, legalArrays...)
+	all = append(all, legalWhitespace...)
+	all = append(all, illegalLiterals...)
+	all = append(all, illegalObjects...)
+	all = append(all, illegalArrays...)
+}
+
 func TestParsing(t *testing.T) {
-	tests := make([]parseTest, 0)
-
-	tests = append(tests, legalLiterals...)
-	tests = append(tests, legalObjects...)
-	tests = append(tests, legalArrays...)
-
-	tests = append(tests, illegalLiterals...)
-	tests = append(tests, illegalObjects...)
-	tests = append(tests, illegalArrays...)
-
-	tests = append(tests, legalWhitespace...)
-
-	for _, test := range tests {
+	for _, test := range all {
 		input := []byte(test.json)
 		pos := 0
 
