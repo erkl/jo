@@ -448,16 +448,18 @@ func TestParsing(t *testing.T) {
 
 			var where int
 			var what Event
+			var desc string
 
 			if len(input)-pos == 0 {
-				log = append(log, "  .End()")
 				where, what = 0, p.End()
+				desc = fmt.Sprintf(".End() -> %s", what)
 			} else {
-				line := fmt.Sprintf("  .Parse(%#q)", input[pos:])
-				log = append(log, line)
-
 				where, what = p.Parse(input[pos:])
+				desc = fmt.Sprintf(".Parse(%#q) -> %d, %s",
+					input[pos:], where, what)
 			}
+
+			log = append(log, "  "+desc)
 
 			if where != event.where || what != event.what {
 				// dump the log output we've accumulated
