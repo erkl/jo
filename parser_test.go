@@ -450,8 +450,8 @@ func TestParsing(t *testing.T) {
 			var what Event
 
 			if len(input)-pos == 0 {
-				log = append(log, "  .Eof()")
-				where, what = 0, p.Eof()
+				log = append(log, "  .End()")
+				where, what = 0, p.End()
 			} else {
 				line := fmt.Sprintf("  .Parse(%#q)", input[pos:])
 				log = append(log, line)

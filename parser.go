@@ -384,10 +384,11 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 	return len(input), Continue
 }
 
-// Informs the parser not to expect any further input. Will return pending
-// NumberEnd events (if there are any), or a SyntaxError event if EOF was
-// not expected -- otherwise Done.
-func (p *Parser) Eof() Event {
+// Informs the parser not to expect any further input (i.e. EOF).
+//
+// Returns a SyntaxError event if invoked before the top-level value has been
+// completely parsed. Otherwise returns dangling NumberEnd events, or Done.
+func (p *Parser) End() Event {
 	switch p.state {
 	case _StateNumberZero,
 		_StateNumber,
@@ -398,7 +399,8 @@ func (p *Parser) Eof() Event {
 	case _StateDone:
 		return Done
 	}
-	return p.error(`.Eof(): @todo`)
+
+	return p.error(`unexpected end of input`)
 }
 
 // Pops the next state off the parser struct's queue.
