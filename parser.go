@@ -53,23 +53,11 @@ const (
 	_StateNull3 // nul
 )
 
-// Parser state machine.
+// Parser state machine. Requires no initialization before use.
 type Parser struct {
 	state int
 	queue []int
 	err   error
-}
-
-// Our own little implementation of the `error` interface.
-type err string
-
-func (e err) Error() string {
-	return string(e)
-}
-
-// Returns the syntax error stored in the parser, if any.
-func (p *Parser) LastError() error {
-	return p.err
 }
 
 // Parses a byte slice containing JSON data. Returns the number of bytes
@@ -403,11 +391,34 @@ func (p *Parser) End() Event {
 	return p.error(`unexpected end of input`)
 }
 
-// Pops the next state off the parser struct's queue.
+// Our own little implementation of the `error` interface.
+type err string
+
+func (e err) Error() string {
+	return string(e)
+}
+
+// Returns the last syntax error detected by the parser, if any.
+func (p *Parser) LastError() error {
+	return p.err
+}
+
+// Convenience function for saving a syntax error.
+func (p *Parser) error(s string) Event {
+	p.err = err(s)
+	return SyntaxError
+}
+
+// Puts a new state at the top of the queue.
+func (p *Parser) push(state int) {
+	p.queue = append(p.queue, state)
+}
+
+// Fetches the next state in the queue.
 func (p *Parser) next() int {
 	length := len(p.queue)
 
-	// with the "state queue" empty, we can only wait for EOF
+	// if the state queue is empty, the top level value has ended
 	if length == 0 {
 		return _StateDone
 	}
@@ -418,25 +429,17 @@ func (p *Parser) next() int {
 	return state
 }
 
-// Insert a new state at the top of the queue.
-func (p *Parser) push(state int) {
-	p.queue = append(p.queue, state)
-}
-
-// Registers a syntax error. Always returns a SyntaxError event.
-func (p *Parser) error(message string) Event {
-	p.err = err(message)
-	return SyntaxError
-}
-
+// Returns true if b is a whitespace character.
 func isSpace(b byte) bool {
 	return b == ' ' || b == '\t' || b == '\n' || b == '\r'
 }
 
+// Returns true if b is a hexadecimal character.
 func isHex(b byte) bool {
 	return isDecimal(b) || ('a' <= b && b <= 'f') || ('A' <= b && b <= 'F')
 }
 
+// Returns true if b is a decimal digit.
 func isDecimal(b byte) bool {
 	return '0' <= b && b <= '9'
 }
