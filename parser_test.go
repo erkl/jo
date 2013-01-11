@@ -638,6 +638,20 @@ var escapeTests = []escapeTest{
 			{6, SyntaxError},
 		},
 	},
+	{
+		`[[],[]]`,
+		[]escape{{2, 1}},
+		[]event{
+			{1, ArrayStart},
+			{1, ArrayStart},
+			// p.Escape(1)
+			{1, ArrayEnd},
+			{2, ArrayStart},
+			{1, ArrayEnd},
+			{1, ArrayEnd},
+			{0, Done},
+		},
+	},
 }
 
 // Tests the parser's Escape() method.

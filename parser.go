@@ -381,6 +381,7 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 
 		if p.escape && p.depth >= p.escapeNext {
 			if p.depth == p.escapeNext {
+				p.escape = (p.escapeNext > p.escapeLast)
 				p.escapeNext--
 			} else {
 				continue
