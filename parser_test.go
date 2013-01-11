@@ -436,85 +436,91 @@ func init() {
 	all = append(all, illegalArrays...)
 }
 
+// Tests basic JSON parsing.
 func TestParsing(t *testing.T) {
 	for _, test := range all {
-		input := []byte(test.json)
-		pos := 0
+		h := helper{t: t, in: []byte(test.json)}
 
-		// instantiate a new Parser and reset the log output
-		// before each test
-		p := Parser{}
-		log := []string{"p := Parser{}"}
+		for i := 0; ; i++ {
+			want := test.events[i]
+			n, ev, eof := h.next()
 
-		// evaluate all expected events
-		for i := 0; i < len(test.events); i++ {
-			event := test.events[i]
-
-			var where int
-			var what Event
-			var desc string
-
-			if len(input)-pos == 0 {
-				where, what = 0, p.End()
-				desc = fmt.Sprintf(".End() -> %s", what)
-			} else {
-				where, what = p.Parse(input[pos:])
-				desc = fmt.Sprintf(".Parse(%#q) -> %d, %s",
-					input[pos:], where, what)
+			if n != want.where || ev != want.what {
+				h.fail("wanted %s at offset %d", want.what, want.where)
+				break
 			}
 
-			log = append(log, "  "+desc)
-
-			if where != event.where || what != event.what {
-				// dump the log output we've accumulated
-				for _, line := range log {
-					t.Logf(line)
-				}
-
-				t.Fatalf("want %s at index %d, got %s at index %d",
-					event.what, event.where, what, where)
+			if eof {
+				break
 			}
-
-			// skip the bytes consumed during the last call
-			// to parser.Parse()
-			pos += where
 		}
 	}
 }
 
+// Tests the parser's Depth() method.
 func TestDepth(t *testing.T) {
-	tests := make([]parseTest, 0)
-
-	tests = append(tests, legalObjects...)
-	tests = append(tests, legalArrays...)
-
-	for _, test := range tests {
-		input := []byte(test.json)
-		pos := 0
-
-		p := Parser{}
-		depth := 0
+	for _, test := range all {
+		h := helper{t: t, in: []byte(test.json)}
+		d := 0
 
 		for {
-			n, event := p.Parse(input[pos:])
+			_, ev, eof := h.next()
 
-			switch event {
+			switch ev {
 			case ObjectStart, ArrayStart:
-				depth++
+				d++
 			case ObjectEnd, ArrayEnd:
-				depth--
+				d--
 			}
 
-			if d := p.Depth(); d != depth {
-				t.Logf("After p.Parse(%#q) -> %d, %s", input[pos:], n, event)
-				t.Fatalf("p.Depth() should be %d, was %d", depth, d)
-			}
-
-			if len(input)-pos == 0 {
+			if got := h.Depth(); got != d {
+				h.fail("depth should be %d, was %d", d, got)
 				break
 			}
 
-			pos += n
+			if eof {
+				break
+			}
 		}
 	}
+}
+
+// Test case helper which wraps around a Parser struct.
+type helper struct {
+	Parser
+	t   *testing.T
+	in  []byte
+	log []string
+}
+
+// Feeds what's left of the JSON input through the parser, then returns the
+// outcome. Calls Parser.End() automatically when all input has been parsed.
+func (h *helper) next() (int, Event, bool) {
+	if len(h.in) == 0 {
+		ev := h.End()
+		h.logf("p.End() -> %s", ev)
+
+		return 0, ev, true
+	}
+
+	n, ev := h.Parse(h.in)
+	h.logf("p.Parse(%#q) -> %d, %s", h.in, n, ev)
+	h.in = h.in[n:]
+
+	// stop on syntax errors
+	return n, ev, ev == SyntaxError
+}
+
+// Logs anything specific to this test case.
+func (h *helper) logf(format string, args ...interface{}) {
+	h.log = append(h.log, fmt.Sprintf(format, args...))
+}
+
+// Reports an error in the current test case.
+func (h *helper) fail(format string, args ...interface{}) {
+	h.t.Log("p := Parser{}")
+	for _, s := range h.log {
+		h.t.Log(s)
+	}
+	h.t.Errorf(format, args...)
 }
