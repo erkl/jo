@@ -266,6 +266,7 @@ var legalArrays = []parseTest{
 			{1, NumberStart},
 			{0, NumberEnd},
 			{1, ArrayEnd},
+			{0, Done},
 		},
 	},
 	{
@@ -279,6 +280,7 @@ var legalArrays = []parseTest{
 			{2, NumberStart},
 			{0, NumberEnd},
 			{1, ArrayEnd},
+			{0, Done},
 		},
 	},
 	{
@@ -381,6 +383,7 @@ var legalWhitespace = []parseTest{
 			{4, StringEnd},
 			{2, ObjectEnd},
 			{1, Continue},
+			{0, Done},
 		},
 	},
 	{
