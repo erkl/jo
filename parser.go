@@ -394,7 +394,8 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 	return len(input), Continue
 }
 
-// Informs the parser not to expect any further input (i.e. EOF).
+// Informs the parser not to expect any further input (most likely caused by
+// EOF).
 //
 // Returns a SyntaxError event if invoked before the top-level value has been
 // completely parsed. Otherwise returns dangling NumberEnd events, or Done.
@@ -425,7 +426,8 @@ func (p *Parser) LastError() error {
 	return p.err
 }
 
-// Returns the current depth of nested objects and arrays.
+// Returns the current depth of nested objects and arrays. Will be 0 for
+// top-level literal values.
 func (p *Parser) Depth() int {
 	return p.depth
 }
@@ -435,14 +437,20 @@ func (p *Parser) Depth() int {
 // parsed.
 //
 //   input := []byte(`[{"foo":"bar"}]`
+//    
 //   p := Parser{}
 //   p.Parse(input[0:])  // -> (1, ArrayStart)
 //   p.Parse(input[1:])  // -> (1, ObjectStart)
+//    
 //   p.Escape(1)         // we don't care about what's in this object
+//    
 //   p.Parse(input[2:])  // -> (12, ObjectEnd)
 //
 // In the above example, we avoided the KeyStart, KeyEnd, StringStart and
 // StringEnd events that normally would have followed the ObjectStart event.
+//
+// Note that Escape can be invoked at any point - not just after ObjectStart or
+// ArrayStart events.
 func (p *Parser) Escape(depth int) {
 	p.escape = true
 	p.escapeNext = p.depth - 1

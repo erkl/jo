@@ -1,7 +1,7 @@
 package jo
 
 const (
-	Continue = iota
+	Continue Event = iota
 	Done
 
 	ObjectStart
@@ -23,6 +23,7 @@ const (
 	SyntaxError
 )
 
+// Represents a change in parser context.
 type Event int
 
 var names = map[Event]string{
@@ -45,6 +46,7 @@ var names = map[Event]string{
 	SyntaxError: "SyntaxError",
 }
 
+// Returns the event's name.
 func (e Event) String() string {
 	name, ok := names[e]
 	if !ok {
