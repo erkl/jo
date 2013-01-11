@@ -485,6 +485,195 @@ func TestDepth(t *testing.T) {
 	}
 }
 
+type escape struct {
+	when, depth int
+}
+
+type escapeTest struct {
+	json    string
+	escapes []escape
+	events  []event
+}
+
+var escapeTests = []escapeTest{
+	{
+		`[]`,
+		[]escape{{1, 1}},
+		[]event{
+			{1, ArrayStart},
+			// p.Escape(1)
+			{1, ArrayEnd},
+			{0, Done},
+		},
+	},
+	{
+		`{"foo":"bar"}`,
+		[]escape{{1, 1}},
+		[]event{
+			{1, ObjectStart},
+			// p.Escape(1)
+			{12, ObjectEnd},
+			{0, Done},
+		},
+	},
+	{
+		`[[{},2,3]]`,
+		[]escape{{2, 1}},
+		[]event{
+			{1, ArrayStart},
+			{1, ArrayStart},
+			// p.Escape(1)
+			{7, ArrayEnd},
+			{1, ArrayEnd},
+			{0, Done},
+		},
+	},
+	{
+		`[[[[[],1],2],3],4]`,
+		[]escape{{5, 5}},
+		[]event{
+			{1, ArrayStart},
+			{1, ArrayStart},
+			{1, ArrayStart},
+			{1, ArrayStart},
+			{1, ArrayStart},
+			// p.Escape(5)
+			{1, ArrayEnd},
+			{3, ArrayEnd},
+			{3, ArrayEnd},
+			{3, ArrayEnd},
+			{3, ArrayEnd},
+			{0, Done},
+		},
+	},
+	{
+		`[{"foo":"bar", "num": 1}, ["deeper", ["and deeper", 1, 2]]]`,
+		[]escape{{2, 2}},
+		[]event{
+			{1, ArrayStart},
+			{1, ObjectStart},
+			// p.Escape(2)
+			{22, ObjectEnd},
+			{35, ArrayEnd},
+			{0, Done},
+		},
+	},
+	{
+		`{"key":123}`,
+		[]escape{{3, 1}},
+		[]event{
+			{1, ObjectStart},
+			{1, KeyStart},
+			{4, KeyEnd},
+			// p.Escape(1)
+			{5, ObjectEnd},
+			{0, Done},
+		},
+	},
+	{
+		`null`,
+		[]escape{{1, 1}},
+		[]event{
+			{1, NullStart},
+			// p.Escape(1)
+			{3, Continue},
+			{0, Done},
+		},
+	},
+	{
+		`[{"foo":"bar"}]`,
+		[]escape{{5, 2}},
+		[]event{
+			{1, ArrayStart},
+			{1, ObjectStart},
+			{1, KeyStart},
+			{4, KeyEnd},
+			{2, StringStart},
+			// p.Escape(2)
+			{5, ObjectEnd},
+			{1, ArrayEnd},
+			{0, Done},
+		},
+	},
+	{
+		`[{"foo":"bar"}]`,
+		[]escape{{5, 2}},
+		[]event{
+			{1, ArrayStart},
+			{1, ObjectStart},
+			{1, KeyStart},
+			{4, KeyEnd},
+			{2, StringStart},
+			// p.Escape(2)
+			{5, ObjectEnd},
+			{1, ArrayEnd},
+			{0, Done},
+		},
+	},
+	{
+		`[["skip"],[]]`,
+		[]escape{{3, 1}, {4, 1}},
+		[]event{
+			{1, ArrayStart},
+			{1, ArrayStart},
+			{1, StringStart},
+			// p.Escape(1)
+			{6, ArrayEnd},
+			// p.Escape(1)
+			{4, ArrayEnd},
+			{0, Done},
+		},
+	},
+	{
+		`{"a":"wub","wrong"}`,
+		[]escape{{6, 1}},
+		[]event{
+			{1, ObjectStart},
+			{1, KeyStart},
+			{2, KeyEnd},
+			{2, StringStart},
+			{4, StringEnd},
+			{2, KeyStart},
+			// p.Escape(1)
+			{6, SyntaxError},
+		},
+	},
+}
+
+// Tests the parser's Escape() method.
+func TestEscape(t *testing.T) {
+	for _, test := range escapeTests {
+		h := helper{t: t, in: []byte(test.json)}
+		n := 0
+
+		for i := 0; ; i++ {
+			// see if the test case wants us to invoke Escape() here
+			if n < len(test.escapes) {
+				esc := test.escapes[n]
+
+				if esc.when == i {
+					h.logf("p.Escape(%d)", esc.depth)
+					h.Escape(esc.depth)
+
+					n++
+				}
+			}
+
+			want := test.events[i]
+			n, ev, eof := h.next()
+
+			if n != want.where || ev != want.what {
+				h.fail("wanted %s at offset %d", want.what, want.where)
+				break
+			}
+
+			if eof {
+				break
+			}
+		}
+	}
+}
+
 // Test case helper which wraps around a Parser struct.
 type helper struct {
 	Parser
