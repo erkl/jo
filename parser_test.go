@@ -477,3 +477,40 @@ func TestParsing(t *testing.T) {
 		}
 	}
 }
+
+func TestDepth(t *testing.T) {
+	tests := make([]parseTest, 0)
+
+	tests = append(tests, legalObjects...)
+	tests = append(tests, legalArrays...)
+
+	for _, test := range tests {
+		input := []byte(test.json)
+		pos := 0
+
+		p := Parser{}
+		depth := 0
+
+		for {
+			n, event := p.Parse(input[pos:])
+
+			switch event {
+			case ObjectStart, ArrayStart:
+				depth++
+			case ObjectEnd, ArrayEnd:
+				depth--
+			}
+
+			if d := p.Depth(); d != depth {
+				t.Logf("After p.Parse(%#q) -> %d, %s", input[pos:], n, event)
+				t.Fatalf("p.Depth() should be %d, was %d", depth, d)
+			}
+
+			if len(input)-pos == 0 {
+				break
+			}
+
+			pos += n
+		}
+	}
+}
