@@ -57,6 +57,7 @@ const (
 type Parser struct {
 	state int
 	queue []int
+	depth int
 	err   error
 }
 
@@ -359,7 +360,12 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 			panic(`invalid state`)
 		}
 
-		if event == SyntaxError {
+		switch event {
+		case ObjectStart, ArrayStart:
+			p.depth++
+		case ObjectEnd, ArrayEnd:
+			p.depth--
+		case SyntaxError:
 			// don't consume the byte that caused the error
 			return i, SyntaxError
 		}
@@ -401,6 +407,11 @@ func (e err) Error() string {
 // Returns the last syntax error detected by the parser, if any.
 func (p *Parser) LastError() error {
 	return p.err
+}
+
+// Returns the current depth of nested objects and arrays.
+func (p *Parser) Depth() int {
+	return p.depth
 }
 
 // Convenience function for saving a syntax error.
