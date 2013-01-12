@@ -5,6 +5,31 @@ import (
 	"testing"
 )
 
+func ExampleParser() {
+	input := []byte(`{ "foo": 10 }`)
+	pos := 0
+
+	p := Parser{}
+
+	for pos < len(input) {
+		n, ev := p.Parse(input[pos:])
+		pos += n
+
+		fmt.Printf("at %2d -> %s\n", pos, ev)
+	}
+
+	fmt.Printf("at %2d -> %s\n", pos, p.End())
+
+	// Output:
+	// at  1 -> ObjectStart
+	// at  3 -> KeyStart
+	// at  7 -> KeyEnd
+	// at 10 -> NumberStart
+	// at 11 -> NumberEnd
+	// at 13 -> ObjectEnd
+	// at 13 -> Done
+}
+
 type event struct {
 	where int
 	what  Event

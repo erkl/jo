@@ -1,0 +1,3 @@
+jo is a light-weight, event-driven JSON parser for Go.
+
+See godoc.org/github.com/wub/jo for details.

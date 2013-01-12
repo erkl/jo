@@ -1,3 +1,4 @@
+// Light-weight, event driven JSON parser.
 package jo
 
 const (
