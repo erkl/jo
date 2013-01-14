@@ -1,26 +1,30 @@
 package jo
 
 const (
-	Continue Event = iota
-	Done
+	_Literal = 1 << 0
+	_Start   = 1 << 2
+	_End     = 1 << 3
 
-	ObjectStart
-	ObjectEnd
-	KeyStart
-	KeyEnd
-	ArrayStart
-	ArrayEnd
+	Continue = (iota << 4)
+	Done     = (iota << 4)
 
-	StringStart
-	StringEnd
-	NumberStart
-	NumberEnd
-	BoolStart
-	BoolEnd
-	NullStart
-	NullEnd
+	ObjectStart = (iota << 4) | _Start
+	ObjectEnd   = (iota << 4) | _End
+	KeyStart    = (iota << 4) | _Start
+	KeyEnd      = (iota << 4) | _End
+	ArrayStart  = (iota << 4) | _Start
+	ArrayEnd    = (iota << 4) | _End
 
-	SyntaxError
+	StringStart = (iota << 4) | _Literal | _Start
+	StringEnd   = (iota << 4) | _Literal | _End
+	NumberStart = (iota << 4) | _Literal | _Start
+	NumberEnd   = (iota << 4) | _Literal | _End
+	BoolStart   = (iota << 4) | _Literal | _Start
+	BoolEnd     = (iota << 4) | _Literal | _End
+	NullStart   = (iota << 4) | _Literal | _Start
+	NullEnd     = (iota << 4) | _Literal | _End
+
+	SyntaxError = (iota << 4)
 )
 
 // Represents a change in parser context.
@@ -54,4 +58,19 @@ func (e Event) String() string {
 	}
 
 	return name
+}
+
+// Returns true if the event regards a literal value.
+func (e Event) IsLiteral() bool {
+	return e&_Literal != 0
+}
+
+// Returns true if the event marks the start of a value.
+func (e Event) IsStart() bool {
+	return e&_Start != 0
+}
+
+// Returns true if the event marks the end of a value.
+func (e Event) IsEnd() bool {
+	return e&_End != 0
 }
