@@ -107,7 +107,7 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 				event = NullStart
 				p.state = _StateNull
 			} else {
-				event = p.error(`expecting beginning of JSON value`)
+				event = p.error(`expected beginning of JSON value`)
 			}
 
 		case _StateObjectKeyOrBrace:
