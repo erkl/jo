@@ -724,19 +724,26 @@ type helper struct {
 // Feeds what's left of the JSON input through the parser, then returns the
 // outcome. Calls Parser.End() automatically when all input has been parsed.
 func (h *helper) next() (int, Event, bool) {
-	if len(h.in) == 0 {
-		ev := h.End()
-		h.logf("p.End() -> %s", ev)
+	total := 0
 
-		return 0, ev, true
+	for len(h.in) > 0 {
+		n, ev := h.Parse(h.in[:1])
+		h.logf("p.Parse(%#q) -> %d, %s", h.in, n, ev)
+
+		h.in = h.in[n:]
+		total += n
+
+		if ev == Continue && len(h.in) > 0 {
+			continue
+		}
+
+		return total, ev, ev == SyntaxError
 	}
 
-	n, ev := h.Parse(h.in)
-	h.logf("p.Parse(%#q) -> %d, %s", h.in, n, ev)
-	h.in = h.in[n:]
+	ev := h.End()
+	h.logf("p.End() -> %s", ev)
 
-	// stop on syntax errors
-	return n, ev, ev == SyntaxError
+	return 0, ev, true
 }
 
 // Logs anything specific to this test case.
