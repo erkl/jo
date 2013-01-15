@@ -65,14 +65,15 @@ type Parser struct {
 // read and an appropriate Event.
 func (p *Parser) Parse(input []byte) (int, Event) {
 	for i := 0; i < len(input); i++ {
-		var event Event = Continue
-		var b byte = input[i]
+		var event = Continue
+		var s = p.state
+		var b = input[i]
 
-		if p.state < _IgnoreSpace && isSpace(b) {
+		if s < _IgnoreSpace && isSpace(b) {
 			continue
 		}
 
-		switch p.state {
+		switch s {
 		case _StateValue:
 			if b == '{' {
 				event = ObjectStart
