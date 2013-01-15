@@ -5,19 +5,19 @@ const (
 	Done
 
 	ObjectStart
-	ObjectEnd
-	KeyStart
-	KeyEnd
 	ArrayStart
-	ArrayEnd
-
+	KeyStart
 	StringStart
-	StringEnd
 	NumberStart
-	NumberEnd
 	BoolStart
-	BoolEnd
 	NullStart
+
+	ObjectEnd
+	ArrayEnd
+	KeyEnd
+	StringEnd
+	NumberEnd
+	BoolEnd
 	NullEnd
 
 	SyntaxError
