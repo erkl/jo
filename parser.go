@@ -6,6 +6,7 @@ const (
 	_StateDone
 
 	_StateObjectKeyOrBrace   // {
+	_StateObjectKeyDone      // {"foo
 	_StateObjectColon        // {"foo"
 	_StateObjectCommaOrBrace // {"foo":"bar"
 	_StateObjectKey          // {"foo":"bar",
@@ -22,14 +23,8 @@ const (
 	_StateStringUnicode3 // "\u12
 	_StateStringUnicode4 // "\u123
 	_StateString         // "
+	_StateStringDone     // "foo
 	_StateStringEscaped  // "\
-
-	_StateKeyUnicode  // "\u
-	_StateKeyUnicode2 // "\u1
-	_StateKeyUnicode3 // "\u12
-	_StateKeyUnicode4 // "\u123
-	_StateKey         // "
-	_StateKeyEscaped  // "\
 
 	_StateNumberNegative      // -
 	_StateNumberZero          // 0
@@ -88,6 +83,7 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 			} else if b == '"' {
 				event = StringStart
 				p.state = _StateString
+				p.push(_StateStringDone)
 			} else if b == '-' {
 				event = NumberStart
 				p.state = _StateNumberNegative
@@ -124,10 +120,17 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 		case _StateObjectKey:
 			if b == '"' {
 				event = KeyStart
-				p.state = _StateKey
+				p.state = _StateString
+				p.push(_StateObjectKeyDone)
 			} else {
 				event = p.error(`expected object key`)
 			}
+
+		case _StateObjectKeyDone:
+			// we wouldn't be here unless b == '"', so we can avoid
+			// checking it again
+			event = KeyEnd
+			p.state = _StateObjectColon
 
 		case _StateObjectColon:
 			if b == ':' {
@@ -170,43 +173,43 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 				event = p.error(`expected ',' or ']' after array value`)
 			}
 
-		case _StateStringUnicode, _StateKeyUnicode,
-			_StateStringUnicode2, _StateKeyUnicode2,
-			_StateStringUnicode3, _StateKeyUnicode3,
-			_StateStringUnicode4, _StateKeyUnicode4:
+		case _StateStringUnicode,
+			_StateStringUnicode2,
+			_StateStringUnicode3,
+			_StateStringUnicode4:
 			if isHex(b) {
 				// move on to the next unicode byte state, or back to
-				// `_State{String/Key}` if this was the fourth hexadecimal
+				// `_StateString` if this was the fourth hexadecimal
 				// character after "\u"
 				p.state++
 			} else {
 				event = p.error(`expected four hexadecimal chars after "\u"`)
 			}
 
-		case _StateString, _StateKey:
+		case _StateString:
 			if b == '"' {
-				if p.state == _StateKey {
-					event = KeyEnd
-					p.state = _StateObjectColon
-				} else {
-					event = StringEnd
-					p.state = p.next()
-				}
+				// forget we saw the double quote, let the next state
+				// "discover" it instead
+				i--
+				p.state = p.next()
 			} else if b == '\\' {
-				// continue with `_State{String,Key}Escaped`
-				p.state++
+				p.state = _StateStringEscaped
 			} else if b < 0x20 {
 				event = p.error(`expected valid string character`)
 			}
 
-		case _StateStringEscaped, _StateKeyEscaped:
+		case _StateStringDone:
+			// we wouldn't be here unless b == '"', so we can avoid
+			// checking it again
+			event = StringEnd
+			p.state = p.next()
+
+		case _StateStringEscaped:
 			switch b {
 			case 'b', 'f', 'n', 'r', 't', '\\', '/', '"':
-				// jump back to _State{String,Key}
-				p.state--
+				p.state = _StateString
 			case 'u':
-				// continue to `_State{String,Key}Unicode`
-				p.state -= 5
+				p.state = _StateStringUnicode
 			default:
 				event = p.error(`expected valid escape sequence after '\'`)
 			}
