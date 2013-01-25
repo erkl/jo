@@ -984,6 +984,44 @@ func TestEscape(t *testing.T) {
 	}
 }
 
+var skipTests = []struct {
+	json   string
+	skip   []int
+	events []event
+}{}
+
+// Tests the parser's Skip() method.
+func TestSkip(t *testing.T) {
+	for _, test := range skipTests {
+		h := helper{t: t, in: []byte(test.json)}
+		n := 0
+
+		for i := 0; ; i++ {
+			// see if the test case wants us to invoke Skip() here
+			if n < len(test.skip) {
+				if test.skip[n] == i {
+					h.logf("p.Skip()")
+					h.Skip()
+
+					n++
+				}
+			}
+
+			want := test.events[i]
+			n, ev, eof := h.next()
+
+			if n != want.where || ev != want.what {
+				h.fail("wanted %s at offset %d", want.what, want.where)
+				break
+			}
+
+			if eof {
+				break
+			}
+		}
+	}
+}
+
 // Test case helper which wraps around a Parser struct.
 type helper struct {
 	Parser

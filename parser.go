@@ -462,6 +462,10 @@ func (p *Parser) Escape(depth int) {
 	p.escapeLast = p.depth - depth
 }
 
+// @todo
+func (p *Parser) Skip() {
+}
+
 // Convenience function for saving a syntax error.
 func (p *Parser) error(s string) Event {
 	p.err = err(s)
