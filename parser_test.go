@@ -6,19 +6,19 @@ import (
 )
 
 func ExampleParser() {
+	parser := Parser{}
+
 	input := []byte(`{ "foo": 10 }`)
-	pos := 0
+	parsed := 0
 
-	p := Parser{}
+	for parsed < len(input) {
+		n, event := parser.Parse(input[parsed:])
+		parsed += n
 
-	for pos < len(input) {
-		n, ev := p.Parse(input[pos:])
-		pos += n
-
-		fmt.Printf("at %2d -> %s\n", pos, ev)
+		fmt.Printf("at %2d -> %s\n", parsed, event)
 	}
 
-	fmt.Printf("at %2d -> %s\n", pos, p.End())
+	fmt.Printf("at %2d -> %s\n", parsed, parser.End())
 
 	// Output:
 	// at  1 -> ObjectStart
