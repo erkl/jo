@@ -988,7 +988,30 @@ var skipTests = []struct {
 	json   string
 	skip   []int
 	events []event
-}{}
+}{
+	{
+		`"hello"`,
+		[]int{1},
+		[]event{
+			{1, StringStart},
+			// p.Skip()
+			{6, Continue},
+			{0, Done},
+		},
+	},
+	{
+		`["a","b"]`,
+		[]int{2},
+		[]event{
+			{1, ArrayStart},
+			{1, StringStart},
+			// p.Skip()
+			{4, StringStart},
+			{2, StringEnd},
+			{1, ArrayEnd},
+		},
+	},
+}
 
 // Tests the parser's Skip() method.
 func TestSkip(t *testing.T) {
