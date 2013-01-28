@@ -4,17 +4,17 @@ const (
 	Continue Event = iota
 	Done
 
+	KeyStart
 	ObjectStart
 	ArrayStart
-	KeyStart
 	StringStart
 	NumberStart
 	BoolStart
 	NullStart
 
+	KeyEnd
 	ObjectEnd
 	ArrayEnd
-	KeyEnd
 	StringEnd
 	NumberEnd
 	BoolEnd
