@@ -6,9 +6,8 @@ import (
 )
 
 func ExampleParser() {
-	parser := Parser{}
-
 	input := []byte(`{ "foo": 10 }`)
+	parser := Parser{}
 	parsed := 0
 
 	for parsed < len(input) {
@@ -30,1064 +29,1002 @@ func ExampleParser() {
 	// at 13 -> Done
 }
 
-type event struct {
-	where int
-	what  Event
+// represents a step in a parser test case
+type step func(*Parser, []byte) (int, bool, string)
+
+// returns a function which checks an event returned by Parser.Parser()
+func parse(offset int, want Event) step {
+	return func(p *Parser, in []byte) (int, bool, string) {
+		n, actual := p.Parse(in)
+		log := fmt.Sprintf(".Parse(%#q) -> %d, %s", in, n, actual)
+
+		if n != offset || actual != want {
+			log = log + fmt.Sprintf(" (want %d, %s)", offset, want)
+			return n, false, log
+		}
+
+		return n, true, log
+	}
 }
 
-var parserTests = []struct {
-	json   string
-	events []event
-}{
+// returns a function which checks the event returned by Parser.End()
+func end(want Event) step {
+	return func(p *Parser, in []byte) (int, bool, string) {
+		actual := p.End()
+		log := fmt.Sprintf(".End(%#q) -> %s", actual)
+
+		if actual != want {
+			log = log + fmt.Sprintf(" (want %s)", actual)
+			return 0, false, log
+		}
+
+		return 0, true, log
+	}
+}
+
+// returns a function which invokes and checks Parser.Depth()
+func depth(want int) step {
+	return func(p *Parser, in []byte) (int, bool, string) {
+		actual := p.Depth()
+		log := fmt.Sprintf(".Depth() -> %d", actual)
+
+		if actual != want {
+			log = log + fmt.Sprintf(" (want %d)", want)
+			return 0, false, log
+		}
+
+		return 0, true, log
+	}
+}
+
+// returns a function which invokes Parser.Skip()
+func skip(depth int, end bool) step {
+	return func(p *Parser, in []byte) (int, bool, string) {
+		p.Skip(depth, end)
+		log := fmt.Sprintf(".Skip(%d, %v)", depth, end)
+
+		return 0, true, log
+	}
+}
+
+// a parser test case
+type parserTest struct {
+	json  string
+	steps []step
+}
+
+// basic parsing tests
+var basicTests = []parserTest{
 	{
 		`""`,
-		[]event{
-			{1, StringStart},
-			{1, StringEnd},
-			{0, Done},
+		[]step{
+			parse(1, StringStart),
+			parse(1, StringEnd),
+			end(Done),
 		},
 	},
 	{
 		`"abc"`,
-		[]event{
-			{1, StringStart},
-			{4, StringEnd},
-			{0, Done},
+		[]step{
+			parse(1, StringStart),
+			parse(4, StringEnd),
+			end(Done),
 		},
 	},
 	{
 		`"\u8bA0"`,
-		[]event{
-			{1, StringStart},
-			{7, StringEnd},
-			{0, Done},
+		[]step{
+			parse(1, StringStart),
+			parse(7, StringEnd),
+			end(Done),
 		},
 	},
 	{
 		`"\u12345"`,
-		[]event{
-			{1, StringStart},
-			{8, StringEnd},
-			{0, Done},
+		[]step{
+			parse(1, StringStart),
+			parse(8, StringEnd),
+			end(Done),
 		},
 	},
 	{
 		"\"\\b\\f\\n\\r\\t\\\\\"",
-		[]event{
-			{1, StringStart},
-			{13, StringEnd},
-			{0, Done},
+		[]step{
+			parse(1, StringStart),
+			parse(13, StringEnd),
+			end(Done),
 		},
 	},
 	{
 		`0`,
-		[]event{
-			{1, NumberStart},
-			{0, NumberEnd},
+		[]step{
+			parse(1, NumberStart),
+			end(NumberEnd),
 		},
 	},
 	{
 		`123`,
-		[]event{
-			{1, NumberStart},
-			{2, Continue},
-			{0, NumberEnd},
+		[]step{
+			parse(1, NumberStart),
+			parse(2, Continue),
+			end(NumberEnd),
 		},
 	},
 	{
 		`-10`,
-		[]event{
-			{1, NumberStart},
-			{2, Continue},
-			{0, NumberEnd},
+		[]step{
+			parse(1, NumberStart),
+			parse(2, Continue),
+			end(NumberEnd),
 		},
 	},
 	{
 		`0.10`,
-		[]event{
-			{1, NumberStart},
-			{3, Continue},
-			{0, NumberEnd},
+		[]step{
+			parse(1, NumberStart),
+			parse(3, Continue),
+			end(NumberEnd),
 		},
 	},
 	{
 		`12.03e+1`,
-		[]event{
-			{1, NumberStart},
-			{7, Continue},
-			{0, NumberEnd},
+		[]step{
+			parse(1, NumberStart),
+			parse(7, Continue),
+			end(NumberEnd),
 		},
 	},
 	{
 		`0.1e2`,
-		[]event{
-			{1, NumberStart},
-			{4, Continue},
-			{0, NumberEnd},
+		[]step{
+			parse(1, NumberStart),
+			parse(4, Continue),
+			end(NumberEnd),
 		},
 	},
 	{
 		`1e1`,
-		[]event{
-			{1, NumberStart},
-			{2, Continue},
-			{0, NumberEnd},
+		[]step{
+			parse(1, NumberStart),
+			parse(2, Continue),
+			end(NumberEnd),
 		},
 	},
 	{
 		`3.141569`,
-		[]event{
-			{1, NumberStart},
-			{7, Continue},
-			{0, NumberEnd},
+		[]step{
+			parse(1, NumberStart),
+			parse(7, Continue),
+			end(NumberEnd),
 		},
 	},
 	{
 		`10000000000000e-10`,
-		[]event{
-			{1, NumberStart},
-			{17, Continue},
-			{0, NumberEnd},
+		[]step{
+			parse(1, NumberStart),
+			parse(17, Continue),
+			end(NumberEnd),
 		},
 	},
 	{
 		`9223372036854775808`,
-		[]event{
-			{1, NumberStart},
-			{18, Continue},
-			{0, NumberEnd},
+		[]step{
+			parse(1, NumberStart),
+			parse(18, Continue),
+			end(NumberEnd),
 		},
 	},
 	{
 		`6E-06`,
-		[]event{
-			{1, NumberStart},
-			{4, Continue},
-			{0, NumberEnd},
+		[]step{
+			parse(1, NumberStart),
+			parse(4, Continue),
+			end(NumberEnd),
 		},
 	},
 	{
 		`1E-06`,
-		[]event{
-			{1, NumberStart},
-			{4, Continue},
-			{0, NumberEnd},
+		[]step{
+			parse(1, NumberStart),
+			parse(4, Continue),
+			end(NumberEnd),
 		},
 	},
 	{
 		`false`,
-		[]event{
-			{1, BoolStart},
-			{4, BoolEnd},
-			{0, Done},
+		[]step{
+			parse(1, BoolStart),
+			parse(4, BoolEnd),
+			end(Done),
 		},
 	},
 	{
 		`true`,
-		[]event{
-			{1, BoolStart},
-			{3, BoolEnd},
-			{0, Done},
+		[]step{
+			parse(1, BoolStart),
+			parse(3, BoolEnd),
+			end(Done),
 		},
 	},
 	{
 		`null`,
-		[]event{
-			{1, NullStart},
-			{3, NullEnd},
-			{0, Done},
+		[]step{
+			parse(1, NullStart),
+			parse(3, NullEnd),
+			end(Done),
 		},
 	},
 	{
 		`"`,
-		[]event{
-			{1, StringStart},
-			{0, SyntaxError},
+		[]step{
+			parse(1, StringStart),
+			end(SyntaxError),
 		},
 	},
 	{
 		`"foo`,
-		[]event{
-			{1, StringStart},
-			{3, Continue},
-			{0, SyntaxError},
+		[]step{
+			parse(1, StringStart),
+			parse(3, Continue),
+			end(SyntaxError),
 		},
 	},
 	{
 		`'single'`,
-		[]event{
-			{0, SyntaxError},
+		[]step{
+			parse(0, SyntaxError),
 		},
 	},
 	{
 		`"\u12g8"`,
-		[]event{
-			{1, StringStart},
-			{4, SyntaxError},
+		[]step{
+			parse(1, StringStart),
+			parse(4, SyntaxError),
 		},
 	},
 	{
 		`"\u"`,
-		[]event{
-			{1, StringStart},
-			{2, SyntaxError},
+		[]step{
+			parse(1, StringStart),
+			parse(2, SyntaxError),
 		},
 	},
 	{
 		`"you can\'t do this"`,
-		[]event{
-			{1, StringStart},
-			{8, SyntaxError},
+		[]step{
+			parse(1, StringStart),
+			parse(8, SyntaxError),
 		},
 	},
 	{
 		`-`,
-		[]event{
-			{1, NumberStart},
-			{0, SyntaxError},
+		[]step{
+			parse(1, NumberStart),
+			end(SyntaxError),
 		},
 	},
 	{
 		`0.`,
-		[]event{
-			{1, NumberStart},
-			{1, Continue},
-			{0, SyntaxError},
+		[]step{
+			parse(1, NumberStart),
+			parse(1, Continue),
+			end(SyntaxError),
 		},
 	},
 	{
 		`123.456.789`,
-		[]event{
-			{1, NumberStart},
-			{6, NumberEnd},
-			{0, SyntaxError},
+		[]step{
+			parse(1, NumberStart),
+			parse(6, NumberEnd),
+			parse(0, SyntaxError),
 		},
 	},
 	{
 		`10e`,
-		[]event{
-			{1, NumberStart},
-			{2, Continue},
-			{0, SyntaxError},
+		[]step{
+			parse(1, NumberStart),
+			parse(2, Continue),
+			end(SyntaxError),
 		},
 	},
 	{
 		`10e+`,
-		[]event{
-			{1, NumberStart},
-			{3, Continue},
-			{0, SyntaxError},
+		[]step{
+			parse(1, NumberStart),
+			parse(3, Continue),
+			end(SyntaxError),
 		},
 	},
 	{
 		`10e-`,
-		[]event{
-			{1, NumberStart},
-			{3, Continue},
-			{0, SyntaxError},
+		[]step{
+			parse(1, NumberStart),
+			parse(3, Continue),
+			end(SyntaxError),
 		},
 	},
 	{
 		`0e1x`,
-		[]event{
-			{1, NumberStart},
-			{2, NumberEnd},
-			{0, SyntaxError},
+		[]step{
+			parse(1, NumberStart),
+			parse(2, NumberEnd),
+			parse(0, SyntaxError),
 		},
 	},
 	{
 		`0e+13.`,
-		[]event{
-			{1, NumberStart},
-			{4, NumberEnd},
-			{0, SyntaxError},
+		[]step{
+			parse(1, NumberStart),
+			parse(4, NumberEnd),
+			parse(0, SyntaxError),
 		},
 	},
 	{
 		`0e+-0`,
-		[]event{
-			{1, NumberStart},
-			{2, SyntaxError},
+		[]step{
+			parse(1, NumberStart),
+			parse(2, SyntaxError),
 		},
 	},
 	{
 		`tr`,
-		[]event{
-			{1, BoolStart},
-			{1, Continue},
-			{0, SyntaxError},
+		[]step{
+			parse(1, BoolStart),
+			parse(1, Continue),
+			end(SyntaxError),
 		},
 	},
 	{
 		`truE`,
-		[]event{
-			{1, BoolStart},
-			{2, SyntaxError},
+		[]step{
+			parse(1, BoolStart),
+			parse(2, SyntaxError),
 		},
 	},
 	{
 		`fals`,
-		[]event{
-			{1, BoolStart},
-			{3, Continue},
-			{0, SyntaxError},
+		[]step{
+			parse(1, BoolStart),
+			parse(3, Continue),
+			end(SyntaxError),
 		},
 	},
 	{
 		`fALSE`,
-		[]event{
-			{1, BoolStart},
-			{0, SyntaxError},
+		[]step{
+			parse(1, BoolStart),
+			parse(0, SyntaxError),
 		},
 	},
 	{
 		`n`,
-		[]event{
-			{1, NullStart},
-			{0, SyntaxError},
+		[]step{
+			parse(1, NullStart),
+			end(SyntaxError),
 		},
 	},
 	{
 		`NULL`,
-		[]event{
-			{0, SyntaxError},
+		[]step{
+			parse(0, SyntaxError),
 		},
 	},
 	{
 		`{}`,
-		[]event{
-			{1, ObjectStart},
-			{1, ObjectEnd},
-			{0, Done},
+		[]step{
+			parse(1, ObjectStart),
+			parse(1, ObjectEnd),
+			end(Done),
 		},
 	},
 	{
 		`{"foo":"bar"}`,
-		[]event{
-			{1, ObjectStart},
-			{1, KeyStart},
-			{4, KeyEnd},
-			{2, StringStart},
-			{4, StringEnd},
-			{1, ObjectEnd},
-			{0, Done},
+		[]step{
+			parse(1, ObjectStart),
+			parse(1, KeyStart),
+			parse(4, KeyEnd),
+			parse(2, StringStart),
+			parse(4, StringEnd),
+			parse(1, ObjectEnd),
+			end(Done),
 		},
 	},
 	{
 		`{"1":1,"2":2}`,
-		[]event{
-			{1, ObjectStart},
-			{1, KeyStart},
-			{2, KeyEnd},
-			{2, NumberStart},
-			{0, NumberEnd},
-			{2, KeyStart},
-			{2, KeyEnd},
-			{2, NumberStart},
-			{0, NumberEnd},
-			{1, ObjectEnd},
-			{0, Done},
+		[]step{
+			parse(1, ObjectStart),
+			parse(1, KeyStart),
+			parse(2, KeyEnd),
+			parse(2, NumberStart),
+			parse(0, NumberEnd),
+			parse(2, KeyStart),
+			parse(2, KeyEnd),
+			parse(2, NumberStart),
+			parse(0, NumberEnd),
+			parse(1, ObjectEnd),
+			end(Done),
 		},
 	},
 	{
 		`{"\u1234\t\n\b\u8BbF\"":0}`,
-		[]event{
-			{1, ObjectStart},
-			{1, KeyStart},
-			{21, KeyEnd},
-			{2, NumberStart},
-			{0, NumberEnd},
-			{1, ObjectEnd},
-			{0, Done},
+		[]step{
+			parse(1, ObjectStart),
+			parse(1, KeyStart),
+			parse(21, KeyEnd),
+			parse(2, NumberStart),
+			parse(0, NumberEnd),
+			parse(1, ObjectEnd),
+			end(Done),
 		},
 	},
 	{
 		`{"{":"}"}`,
-		[]event{
-			{1, ObjectStart},
-			{1, KeyStart},
-			{2, KeyEnd},
-			{2, StringStart},
-			{2, StringEnd},
-			{1, ObjectEnd},
-			{0, Done},
+		[]step{
+			parse(1, ObjectStart),
+			parse(1, KeyStart),
+			parse(2, KeyEnd),
+			parse(2, StringStart),
+			parse(2, StringEnd),
+			parse(1, ObjectEnd),
+			end(Done),
 		},
 	},
 	{
 		`{"foo":{"bar":{"baz":{}}}}`,
-		[]event{
-			{1, ObjectStart},
-			{1, KeyStart},
-			{4, KeyEnd},
-			{2, ObjectStart},
-			{1, KeyStart},
-			{4, KeyEnd},
-			{2, ObjectStart},
-			{1, KeyStart},
-			{4, KeyEnd},
-			{2, ObjectStart},
-			{1, ObjectEnd},
-			{1, ObjectEnd},
-			{1, ObjectEnd},
-			{1, ObjectEnd},
-			{0, Done},
+		[]step{
+			parse(1, ObjectStart),
+			parse(1, KeyStart),
+			parse(4, KeyEnd),
+			parse(2, ObjectStart),
+			parse(1, KeyStart),
+			parse(4, KeyEnd),
+			parse(2, ObjectStart),
+			parse(1, KeyStart),
+			parse(4, KeyEnd),
+			parse(2, ObjectStart),
+			parse(1, ObjectEnd),
+			parse(1, ObjectEnd),
+			parse(1, ObjectEnd),
+			parse(1, ObjectEnd),
+			end(Done),
 		},
 	},
 	{
 		`{"true":true,"false":false,"null":null}`,
-		[]event{
-			{1, ObjectStart},
-			{1, KeyStart},
-			{5, KeyEnd},
-			{2, BoolStart},
-			{3, BoolEnd},
-			{2, KeyStart},
-			{6, KeyEnd},
-			{2, BoolStart},
-			{4, BoolEnd},
-			{2, KeyStart},
-			{5, KeyEnd},
-			{2, NullStart},
-			{3, NullEnd},
-			{1, ObjectEnd},
-			{0, Done},
+		[]step{
+			parse(1, ObjectStart),
+			parse(1, KeyStart),
+			parse(5, KeyEnd),
+			parse(2, BoolStart),
+			parse(3, BoolEnd),
+			parse(2, KeyStart),
+			parse(6, KeyEnd),
+			parse(2, BoolStart),
+			parse(4, BoolEnd),
+			parse(2, KeyStart),
+			parse(5, KeyEnd),
+			parse(2, NullStart),
+			parse(3, NullEnd),
+			parse(1, ObjectEnd),
+			end(Done),
 		},
 	},
 	{
 		`{0:1}`,
-		[]event{
-			{1, ObjectStart},
-			{0, SyntaxError},
+		[]step{
+			parse(1, ObjectStart),
+			parse(0, SyntaxError),
 		},
 	},
 	{
 		`{"foo":"bar"`,
-		[]event{
-			{1, ObjectStart},
-			{1, KeyStart},
-			{4, KeyEnd},
-			{2, StringStart},
-			{4, StringEnd},
-			{0, SyntaxError},
+		[]step{
+			parse(1, ObjectStart),
+			parse(1, KeyStart),
+			parse(4, KeyEnd),
+			parse(2, StringStart),
+			parse(4, StringEnd),
+			end(SyntaxError),
 		},
 	},
 	{
 		`{{`,
-		[]event{
-			{1, ObjectStart},
-			{0, SyntaxError},
+		[]step{
+			parse(1, ObjectStart),
+			parse(0, SyntaxError),
 		},
 	},
 	{
 		`{"a":1,}`,
-		[]event{
-			{1, ObjectStart},
-			{1, KeyStart},
-			{2, KeyEnd},
-			{2, NumberStart},
-			{0, NumberEnd},
-			{1, SyntaxError},
+		[]step{
+			parse(1, ObjectStart),
+			parse(1, KeyStart),
+			parse(2, KeyEnd),
+			parse(2, NumberStart),
+			parse(0, NumberEnd),
+			parse(1, SyntaxError),
 		},
 	},
 	{
 		`{"a":1,,`,
-		[]event{
-			{1, ObjectStart},
-			{1, KeyStart},
-			{2, KeyEnd},
-			{2, NumberStart},
-			{0, NumberEnd},
-			{1, SyntaxError},
+		[]step{
+			parse(1, ObjectStart),
+			parse(1, KeyStart),
+			parse(2, KeyEnd),
+			parse(2, NumberStart),
+			parse(0, NumberEnd),
+			parse(1, SyntaxError),
 		},
 	},
 	{
 		`{"a"}`,
-		[]event{
-			{1, ObjectStart},
-			{1, KeyStart},
-			{2, KeyEnd},
-			{0, SyntaxError},
+		[]step{
+			parse(1, ObjectStart),
+			parse(1, KeyStart),
+			parse(2, KeyEnd),
+			parse(0, SyntaxError),
 		},
 	},
 	{
 		`{"a":"1}`,
-		[]event{
-			{1, ObjectStart},
-			{1, KeyStart},
-			{2, KeyEnd},
-			{2, StringStart},
-			{2, Continue},
-			{0, SyntaxError},
+		[]step{
+			parse(1, ObjectStart),
+			parse(1, KeyStart),
+			parse(2, KeyEnd),
+			parse(2, StringStart),
+			parse(2, Continue),
+			end(SyntaxError),
 		},
 	},
 	{
 		`{"a":1"b":2}`,
-		[]event{
-			{1, ObjectStart},
-			{1, KeyStart},
-			{2, KeyEnd},
-			{2, NumberStart},
-			{0, NumberEnd},
-			{0, SyntaxError},
+		[]step{
+			parse(1, ObjectStart),
+			parse(1, KeyStart),
+			parse(2, KeyEnd),
+			parse(2, NumberStart),
+			parse(0, NumberEnd),
+			parse(0, SyntaxError),
 		},
 	},
 
 	{
 		`[]`,
-		[]event{
-			{1, ArrayStart},
-			{1, ArrayEnd},
-			{0, Done},
+		[]step{
+			parse(1, ArrayStart),
+			parse(1, ArrayEnd),
+			end(Done),
 		},
 	},
 	{
 		`[1]`,
-		[]event{
-			{1, ArrayStart},
-			{1, NumberStart},
-			{0, NumberEnd},
-			{1, ArrayEnd},
-			{0, Done},
+		[]step{
+			parse(1, ArrayStart),
+			parse(1, NumberStart),
+			parse(0, NumberEnd),
+			parse(1, ArrayEnd),
+			end(Done),
 		},
 	},
 	{
 		`[1,2,3]`,
-		[]event{
-			{1, ArrayStart},
-			{1, NumberStart},
-			{0, NumberEnd},
-			{2, NumberStart},
-			{0, NumberEnd},
-			{2, NumberStart},
-			{0, NumberEnd},
-			{1, ArrayEnd},
-			{0, Done},
+		[]step{
+			parse(1, ArrayStart),
+			parse(1, NumberStart),
+			parse(0, NumberEnd),
+			parse(2, NumberStart),
+			parse(0, NumberEnd),
+			parse(2, NumberStart),
+			parse(0, NumberEnd),
+			parse(1, ArrayEnd),
+			end(Done),
 		},
 	},
 	{
 		`["dude","what"]`,
-		[]event{
-			{1, ArrayStart},
-			{1, StringStart},
-			{5, StringEnd},
-			{2, StringStart},
-			{5, StringEnd},
-			{1, ArrayEnd},
-			{0, Done},
+		[]step{
+			parse(1, ArrayStart),
+			parse(1, StringStart),
+			parse(5, StringEnd),
+			parse(2, StringStart),
+			parse(5, StringEnd),
+			parse(1, ArrayEnd),
+			end(Done),
 		},
 	},
 	{
 		`[[[],[]],[]]`,
-		[]event{
-			{1, ArrayStart},
-			{1, ArrayStart},
-			{1, ArrayStart},
-			{1, ArrayEnd},
-			{2, ArrayStart},
-			{1, ArrayEnd},
-			{1, ArrayEnd},
-			{2, ArrayStart},
-			{1, ArrayEnd},
-			{1, ArrayEnd},
-			{0, Done},
+		[]step{
+			parse(1, ArrayStart),
+			parse(1, ArrayStart),
+			parse(1, ArrayStart),
+			parse(1, ArrayEnd),
+			parse(2, ArrayStart),
+			parse(1, ArrayEnd),
+			parse(1, ArrayEnd),
+			parse(2, ArrayStart),
+			parse(1, ArrayEnd),
+			parse(1, ArrayEnd),
+			end(Done),
 		},
 	},
 	{
 		`[10.3]`,
-		[]event{
-			{1, ArrayStart},
-			{1, NumberStart},
-			{3, NumberEnd},
-			{1, ArrayEnd},
-			{0, Done},
+		[]step{
+			parse(1, ArrayStart),
+			parse(1, NumberStart),
+			parse(3, NumberEnd),
+			parse(1, ArrayEnd),
+			end(Done),
 		},
 	},
 	{
 		`["][\"]"]`,
-		[]event{
-			{1, ArrayStart},
-			{1, StringStart},
-			{6, StringEnd},
-			{1, ArrayEnd},
-			{0, Done},
+		[]step{
+			parse(1, ArrayStart),
+			parse(1, StringStart),
+			parse(6, StringEnd),
+			parse(1, ArrayEnd),
+			end(Done),
 		},
 	},
 	{
 		`[`,
-		[]event{
-			{1, ArrayStart},
-			{0, SyntaxError},
+		[]step{
+			parse(1, ArrayStart),
+			end(SyntaxError),
 		},
 	},
 	{
 		`[,]`,
-		[]event{
-			{1, ArrayStart},
-			{0, SyntaxError},
+		[]step{
+			parse(1, ArrayStart),
+			parse(0, SyntaxError),
 		},
 	},
 	{
 		`[10,]`,
-		[]event{
-			{1, ArrayStart},
-			{1, NumberStart},
-			{1, NumberEnd},
-			{1, SyntaxError},
+		[]step{
+			parse(1, ArrayStart),
+			parse(1, NumberStart),
+			parse(1, NumberEnd),
+			parse(1, SyntaxError),
 		},
 	},
 	{
 		`[}`,
-		[]event{
-			{1, ArrayStart},
-			{0, SyntaxError},
+		[]step{
+			parse(1, ArrayStart),
+			parse(0, SyntaxError),
 		},
 	},
 	{
 		` 17`,
-		[]event{
-			{2, NumberStart},
-			{1, Continue},
-			{0, NumberEnd},
+		[]step{
+			parse(2, NumberStart),
+			parse(1, Continue),
+			end(NumberEnd),
 		},
 	},
 	{`38 `,
-		[]event{
-			{1, NumberStart},
-			{1, NumberEnd},
-			{1, Continue},
-			{0, Done},
+		[]step{
+			parse(1, NumberStart),
+			parse(1, NumberEnd),
+			parse(1, Continue),
+			end(Done),
 		},
 	},
 	{
 		`  " what ? "  `,
-		[]event{
-			{3, StringStart},
-			{9, StringEnd},
-			{2, Continue},
-			{0, Done},
+		[]step{
+			parse(3, StringStart),
+			parse(9, StringEnd),
+			parse(2, Continue),
+			end(Done),
 		},
 	},
 	{
 		"\nnull",
-		[]event{
-			{2, NullStart},
-			{3, NullEnd},
-			{0, Done},
+		[]step{
+			parse(2, NullStart),
+			parse(3, NullEnd),
+			end(Done),
 		},
 	},
 	{
 		"\n\r\t true \r\n\t",
-		[]event{
-			{5, BoolStart},
-			{3, BoolEnd},
-			{4, Continue},
-			{0, Done},
+		[]step{
+			parse(5, BoolStart),
+			parse(3, BoolEnd),
+			parse(4, Continue),
+			end(Done),
 		},
 	},
 	{
 		" { \"foo\": \t\"bar\" } ",
-		[]event{
-			{2, ObjectStart},
-			{2, KeyStart},
-			{4, KeyEnd},
-			{4, StringStart},
-			{4, StringEnd},
-			{2, ObjectEnd},
-			{1, Continue},
-			{0, Done},
+		[]step{
+			parse(2, ObjectStart),
+			parse(2, KeyStart),
+			parse(4, KeyEnd),
+			parse(4, StringStart),
+			parse(4, StringEnd),
+			parse(2, ObjectEnd),
+			parse(1, Continue),
+			end(Done),
 		},
 	},
 	{
 		"\t[ 1 , 2\r, 3\n]",
-		[]event{
-			{2, ArrayStart},
-			{2, NumberStart},
-			{0, NumberEnd},
-			{4, NumberStart},
-			{0, NumberEnd},
-			{4, NumberStart},
-			{0, NumberEnd},
-			{2, ArrayEnd},
-			{0, Done},
+		[]step{
+			parse(2, ArrayStart),
+			parse(2, NumberStart),
+			parse(0, NumberEnd),
+			parse(4, NumberStart),
+			parse(0, NumberEnd),
+			parse(4, NumberStart),
+			parse(0, NumberEnd),
+			parse(2, ArrayEnd),
+			end(Done),
 		},
 	},
 	{
 		" \n{ \t\"foo\" : [ \"bar\", null ], \"what\\n\"\t: 10.3e1 } ",
-		[]event{
-			{3, ObjectStart},
-			{3, KeyStart},
-			{4, KeyEnd},
-			{4, ArrayStart},
-			{2, StringStart},
-			{4, StringEnd},
-			{3, NullStart},
-			{3, NullEnd},
-			{2, ArrayEnd},
-			{3, KeyStart},
-			{7, KeyEnd},
-			{4, NumberStart},
-			{5, NumberEnd},
-			{2, ObjectEnd},
-			{1, Continue},
-			{0, Done},
+		[]step{
+			parse(3, ObjectStart),
+			parse(3, KeyStart),
+			parse(4, KeyEnd),
+			parse(4, ArrayStart),
+			parse(2, StringStart),
+			parse(4, StringEnd),
+			parse(3, NullStart),
+			parse(3, NullEnd),
+			parse(2, ArrayEnd),
+			parse(3, KeyStart),
+			parse(7, KeyEnd),
+			parse(4, NumberStart),
+			parse(5, NumberEnd),
+			parse(2, ObjectEnd),
+			parse(1, Continue),
+			end(Done),
 		},
 	},
 }
 
-// Tests basic JSON parsing.
-func TestParsing(t *testing.T) {
-	for _, test := range parserTests {
-		h := helper{t: t, in: []byte(test.json)}
-
-		for i := 0; ; i++ {
-			want := test.events[i]
-			n, ev, eof := h.next()
-
-			if n != want.where || ev != want.what {
-				h.fail("wanted %s at offset %d", want.what, want.where)
-				break
-			}
-
-			if eof {
-				break
-			}
-		}
-	}
+// tests involving Parser.Depth()
+var depthTests = []parserTest{
+	{
+		`"hello"`,
+		[]step{
+			depth(0),
+			parse(1, StringStart),
+			depth(1),
+			parse(6, StringEnd),
+			end(Done),
+		},
+	},
+	{
+		`{"what":false}`,
+		[]step{
+			parse(1, ObjectStart),
+			depth(1),
+			parse(1, KeyStart),
+			depth(2),
+			parse(5, KeyEnd),
+			depth(2),
+			parse(2, BoolStart),
+			parse(4, BoolEnd),
+			depth(1),
+			parse(1, ObjectEnd),
+			end(Done),
+		},
+	},
+	{
+		`[[[]]]`,
+		[]step{
+			parse(1, ArrayStart),
+			parse(1, ArrayStart),
+			depth(2),
+			parse(1, ArrayStart),
+			parse(1, ArrayEnd),
+			parse(1, ArrayEnd),
+			depth(1),
+			parse(1, ArrayEnd),
+			end(Done),
+		},
+	},
 }
 
-// Tests the parser's Depth() method.
-func TestDepth(t *testing.T) {
-	for _, test := range parserTests {
-		h := helper{t: t, in: []byte(test.json)}
-		d := 0
-
-		for {
-			_, ev, eof := h.next()
-
-			switch ev {
-			case ObjectStart, ArrayStart:
-				d++
-			case ObjectEnd, ArrayEnd:
-				d--
-			}
-
-			if got := h.Depth(); got != d {
-				h.fail("depth should be %d, was %d", d, got)
-				break
-			}
-
-			if eof {
-				break
-			}
-		}
-	}
-}
-
-type escape struct {
-	when, depth int
-}
-
-var escapeTests = []struct {
-	json    string
-	escapes []escape
-	events  []event
-}{
+// tests involving Parser.Skip()
+var skipTests = []parserTest{
 	{
 		`[]`,
-		[]escape{{1, 1}},
-		[]event{
-			{1, ArrayStart},
-			// p.Escape(1)
-			{1, ArrayEnd},
-			{0, Done},
+		[]step{
+			parse(1, ArrayStart),
+			skip(1, true),
+			parse(1, ArrayEnd),
+			end(Done),
 		},
 	},
 	{
 		`{"foo":"bar"}`,
-		[]escape{{1, 1}},
-		[]event{
-			{1, ObjectStart},
-			// p.Escape(1)
-			{12, ObjectEnd},
-			{0, Done},
+		[]step{
+			parse(1, ObjectStart),
+			skip(1, true),
+			parse(12, ObjectEnd),
+			end(Done),
 		},
 	},
 	{
 		`[[{},2,3]]`,
-		[]escape{{2, 1}},
-		[]event{
-			{1, ArrayStart},
-			{1, ArrayStart},
-			// p.Escape(1)
-			{7, ArrayEnd},
-			{1, ArrayEnd},
-			{0, Done},
+		[]step{
+			parse(1, ArrayStart),
+			parse(1, ArrayStart),
+			skip(1, true),
+			parse(7, ArrayEnd),
+			parse(1, ArrayEnd),
+			end(Done),
 		},
 	},
 	{
 		`[[[[[],1],2],3],4]`,
-		[]escape{{5, 5}},
-		[]event{
-			{1, ArrayStart},
-			{1, ArrayStart},
-			{1, ArrayStart},
-			{1, ArrayStart},
-			{1, ArrayStart},
-			// p.Escape(5)
-			{1, ArrayEnd},
-			{3, ArrayEnd},
-			{3, ArrayEnd},
-			{3, ArrayEnd},
-			{3, ArrayEnd},
-			{0, Done},
+		[]step{
+			parse(1, ArrayStart),
+			parse(1, ArrayStart),
+			parse(1, ArrayStart),
+			parse(1, ArrayStart),
+			parse(1, ArrayStart),
+			skip(5, true),
+			parse(1, ArrayEnd),
+			parse(3, ArrayEnd),
+			parse(3, ArrayEnd),
+			parse(3, ArrayEnd),
+			parse(3, ArrayEnd),
+			end(Done),
 		},
 	},
 	{
 		`[{"foo":"bar", "num": 1}, ["deeper", ["and deeper", 1, 2]]]`,
-		[]escape{{2, 2}},
-		[]event{
-			{1, ArrayStart},
-			{1, ObjectStart},
-			// p.Escape(2)
-			{22, ObjectEnd},
-			{35, ArrayEnd},
-			{0, Done},
+		[]step{
+			parse(1, ArrayStart),
+			parse(1, ObjectStart),
+			skip(2, true),
+			parse(22, ObjectEnd),
+			parse(35, ArrayEnd),
+			end(Done),
 		},
 	},
 	{
 		`{"key":123}`,
-		[]escape{{3, 1}},
-		[]event{
-			{1, ObjectStart},
-			{1, KeyStart},
-			{4, KeyEnd},
-			// p.Escape(1)
-			{5, ObjectEnd},
-			{0, Done},
+		[]step{
+			parse(1, ObjectStart),
+			parse(1, KeyStart),
+			parse(4, KeyEnd),
+			skip(1, false),
+			parse(5, ObjectEnd),
+			end(Done),
 		},
 	},
 	{
 		`null`,
-		[]escape{{1, 1}},
-		[]event{
-			{1, NullStart},
-			// p.Escape(1)
-			{3, Continue},
-			{0, Done},
+		[]step{
+			parse(1, NullStart),
+			skip(1, true),
+			parse(3, NullEnd),
+			end(Done),
+		},
+	},
+	{
+		`[{"foo":"bar"},10]`,
+		[]step{
+			parse(1, ArrayStart),
+			parse(1, ObjectStart),
+			parse(1, KeyStart),
+			parse(4, KeyEnd),
+			parse(2, StringStart),
+			skip(3, true),
+			parse(4, StringEnd),
+			parse(1, ObjectEnd),
+			parse(4, ArrayEnd),
+			end(Done),
 		},
 	},
 	{
 		`[{"foo":"bar"}]`,
-		[]escape{{5, 2}},
-		[]event{
-			{1, ArrayStart},
-			{1, ObjectStart},
-			{1, KeyStart},
-			{4, KeyEnd},
-			{2, StringStart},
-			// p.Escape(2)
-			{5, ObjectEnd},
-			{1, ArrayEnd},
-			{0, Done},
-		},
-	},
-	{
-		`[{"foo":"bar"}]`,
-		[]escape{{5, 2}},
-		[]event{
-			{1, ArrayStart},
-			{1, ObjectStart},
-			{1, KeyStart},
-			{4, KeyEnd},
-			{2, StringStart},
-			// p.Escape(2)
-			{5, ObjectEnd},
-			{1, ArrayEnd},
-			{0, Done},
+		[]step{
+			parse(1, ArrayStart),
+			parse(1, ObjectStart),
+			parse(1, KeyStart),
+			parse(4, KeyEnd),
+			parse(2, StringStart),
+			skip(1, false),
+			parse(5, ObjectEnd),
+			parse(1, ArrayEnd),
+			end(Done),
 		},
 	},
 	{
 		`[["skip"],[]]`,
-		[]escape{{3, 1}, {4, 1}},
-		[]event{
-			{1, ArrayStart},
-			{1, ArrayStart},
-			{1, StringStart},
-			// p.Escape(1)
-			{6, ArrayEnd},
-			// p.Escape(1)
-			{4, ArrayEnd},
-			{0, Done},
+		[]step{
+			parse(1, ArrayStart),
+			parse(1, ArrayStart),
+			parse(1, StringStart),
+			skip(1, false),
+			parse(6, ArrayEnd),
+			skip(1, true),
+			parse(4, ArrayEnd),
+			end(Done),
 		},
 	},
 	{
 		`{"a":"wub","wrong"}`,
-		[]escape{{6, 1}},
-		[]event{
-			{1, ObjectStart},
-			{1, KeyStart},
-			{2, KeyEnd},
-			{2, StringStart},
-			{4, StringEnd},
-			{2, KeyStart},
-			// p.Escape(1)
-			{6, SyntaxError},
+		[]step{
+			parse(1, ObjectStart),
+			parse(1, KeyStart),
+			parse(2, KeyEnd),
+			parse(2, StringStart),
+			parse(4, StringEnd),
+			parse(2, KeyStart),
+			skip(1, true),
+			parse(6, SyntaxError),
 		},
 	},
 	{
 		`[[],[]]`,
-		[]escape{{2, 1}},
-		[]event{
-			{1, ArrayStart},
-			{1, ArrayStart},
-			// p.Escape(1)
-			{1, ArrayEnd},
-			{2, ArrayStart},
-			{1, ArrayEnd},
-			{1, ArrayEnd},
-			{0, Done},
+		[]step{
+			parse(1, ArrayStart),
+			parse(1, ArrayStart),
+			skip(1, true),
+			parse(1, ArrayEnd),
+			parse(2, ArrayStart),
+			parse(1, ArrayEnd),
+			parse(1, ArrayEnd),
+			end(Done),
 		},
 	},
-}
-
-// Tests the parser's Escape() method.
-func TestEscape(t *testing.T) {
-	for _, test := range escapeTests {
-		h := helper{t: t, in: []byte(test.json)}
-		n := 0
-
-		for i := 0; ; i++ {
-			// see if the test case wants us to invoke Escape() here
-			if n < len(test.escapes) {
-				esc := test.escapes[n]
-
-				if esc.when == i {
-					h.logf("p.Escape(%d)", esc.depth)
-					h.Escape(esc.depth)
-
-					n++
-				}
-			}
-
-			want := test.events[i]
-			n, ev, eof := h.next()
-
-			if n != want.where || ev != want.what {
-				h.fail("wanted %s at offset %d", want.what, want.where)
-				break
-			}
-
-			if eof {
-				break
-			}
-		}
-	}
-}
-
-var skipTests = []struct {
-	json   string
-	skip   []int
-	events []event
-}{
 	{
 		`"hello"`,
-		[]int{1},
-		[]event{
-			{1, StringStart},
-			// p.Skip()
-			{6, Continue},
-			{0, Done},
+		[]step{
+			parse(1, StringStart),
+			skip(1, false),
+			parse(6, Continue),
+			end(Done),
 		},
 	},
 	{
 		`["a","b"]`,
-		[]int{2},
-		[]event{
-			{1, ArrayStart},
-			{1, StringStart},
-			// p.Skip()
-			{4, StringStart},
-			{2, StringEnd},
-			{1, ArrayEnd},
+		[]step{
+			parse(1, ArrayStart),
+			parse(1, StringStart),
+			skip(1, false),
+			parse(4, StringStart),
+			parse(2, StringEnd),
+			parse(1, ArrayEnd),
+			end(Done),
 		},
 	},
 }
 
-// Tests the parser's Skip() method.
-func TestSkip(t *testing.T) {
-	for _, test := range skipTests {
-		h := helper{t: t, in: []byte(test.json)}
-		n := 0
+func TestParser(t *testing.T) {
+	tests := make([]parserTest, 0)
+	tests = append(tests, basicTests...)
+	// tests = append(tests, depthTests...)
+	// tests = append(tests, skipTests...)
 
-		for i := 0; ; i++ {
-			// see if the test case wants us to invoke Skip() here
-			if n < len(test.skip) {
-				if test.skip[n] == i {
-					h.logf("p.Skip()")
-					h.Skip()
+	for _, test := range tests {
+		b := []byte(test.json)
+		o := "\np := Parser{}"
+		p := &Parser{}
 
-					n++
-				}
-			}
+		for i := 0; i < len(test.steps); i++ {
+			n, ok, log := test.steps[i](p, b)
+			o = o + "\np" + log
 
-			want := test.events[i]
-			n, ev, eof := h.next()
-
-			if n != want.where || ev != want.what {
-				h.fail("wanted %s at offset %d", want.what, want.where)
+			if !ok {
+				t.Errorf(o)
 				break
 			}
 
-			if eof {
-				break
-			}
+			b = b[n:]
 		}
 	}
-}
-
-// Test case helper which wraps around a Parser struct.
-type helper struct {
-	Parser
-	t   *testing.T
-	in  []byte
-	log []string
-}
-
-// Feeds what's left of the JSON input through the parser, then returns the
-// outcome. Calls Parser.End() automatically when all input has been parsed.
-func (h *helper) next() (int, Event, bool) {
-	total := 0
-
-	for len(h.in) > 0 {
-		n, ev := h.Parse(h.in[:1])
-		h.logf("p.Parse(%#q) -> %d, %s", h.in, n, ev)
-
-		h.in = h.in[n:]
-		total += n
-
-		if ev == Continue && len(h.in) > 0 {
-			continue
-		}
-
-		return total, ev, ev == SyntaxError
-	}
-
-	ev := h.End()
-	h.logf("p.End() -> %s", ev)
-
-	return 0, ev, true
-}
-
-// Logs anything specific to this test case.
-func (h *helper) logf(format string, args ...interface{}) {
-	h.log = append(h.log, fmt.Sprintf(format, args...))
-}
-
-// Reports an error in the current test case.
-func (h *helper) fail(format string, args ...interface{}) {
-	h.t.Log("p := Parser{}")
-	for _, s := range h.log {
-		h.t.Log(s)
-	}
-	h.t.Errorf(format, args...)
 }
