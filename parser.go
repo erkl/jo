@@ -66,6 +66,10 @@ type Parser struct {
 
 // Parses a byte slice containing JSON data. Returns the number of bytes
 // read and an appropriate Event.
+//
+// The third return value will be nil unless the second is a SyntaxError
+// event, in which case it's an error describing the syntax error
+// encountered.
 func (p *Parser) Parse(input []byte) (int, Event, error) {
 	for i := 0; i < len(input); i++ {
 		event := Continue
@@ -428,11 +432,11 @@ func (p *Parser) Parse(input []byte) (int, Event, error) {
 	return len(input), Continue, nil
 }
 
-// Informs the parser not to expect any further input (most likely caused by
-// EOF).
+// Informs the parser not to expect any further input (EOF).
 //
-// Returns a SyntaxError event if invoked before the top-level value has been
-// completely parsed. Otherwise returns dangling NumberEnd events, or Done.
+// Returns a SyntaxError event and a descriptive error if invoked before the
+// top-level value has been completely parsed. Otherwise returns dangling
+// NumberEnd events, or Done.
 func (p *Parser) End() (Event, error) {
 	switch p.state {
 	case _StateNumberZero,
@@ -488,7 +492,8 @@ func (p *Parser) Depth() int {
 //   p.Parse(in[17:])  // -> (18, ArrayEnd, nil)
 //   p.End()           // -> (Done, nil)
 //
-// If drop + empty is greater than the current depth, the function will panic.
+// Panics on values of drop and empty such that drop + empty is greater than
+// the current depth.
 func (p *Parser) Skip(drop, empty int) {
 }
 

@@ -47,6 +47,9 @@ var names = map[Event]string{
 }
 
 // Returns the event's name.
+//
+//   BoolStart.String()  // -> "BoolStart"
+//   Event(-1).String()  // -> "INVALID"
 func (e Event) String() string {
 	name, ok := names[e]
 	if !ok {
