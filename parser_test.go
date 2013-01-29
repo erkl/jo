@@ -1028,8 +1028,8 @@ var skipTests = []parserTest{
 func TestParser(t *testing.T) {
 	tests := make([]parserTest, 0)
 	tests = append(tests, basicTests...)
-	// tests = append(tests, depthTests...)
-	// tests = append(tests, skipTests...)
+	tests = append(tests, depthTests...)
+	tests = append(tests, skipTests...)
 
 	for _, test := range tests {
 		b := []byte(test.json)
