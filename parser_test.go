@@ -78,9 +78,9 @@ func depth(want int) step {
 }
 
 // returns a function which invokes Parser.Skip()
-func skip(depth int, end bool) step {
+func skip(dead, empty int) step {
 	return func(p *Parser, in []byte) (int, bool, string) {
-		p.Skip(depth, end)
+		p.Skip(dead, empty)
 		log := fmt.Sprintf(".Skip(%d, %v)", depth, end)
 
 		return 0, true, log
@@ -840,7 +840,16 @@ var skipTests = []parserTest{
 		`[]`,
 		[]step{
 			parse(1, ArrayStart),
-			skip(1, true),
+			skip(1, 0),
+			parse(1, Continue),
+			end(Done),
+		},
+	},
+	{
+		`[]`,
+		[]step{
+			parse(1, ArrayStart),
+			skip(0, 1),
 			parse(1, ArrayEnd),
 			end(Done),
 		},
@@ -849,7 +858,7 @@ var skipTests = []parserTest{
 		`{"foo":"bar"}`,
 		[]step{
 			parse(1, ObjectStart),
-			skip(1, true),
+			skip(1, 0),
 			parse(12, ObjectEnd),
 			end(Done),
 		},
@@ -859,7 +868,7 @@ var skipTests = []parserTest{
 		[]step{
 			parse(1, ArrayStart),
 			parse(1, ArrayStart),
-			skip(1, true),
+			skip(0, 2),
 			parse(7, ArrayEnd),
 			parse(1, ArrayEnd),
 			end(Done),
@@ -873,7 +882,7 @@ var skipTests = []parserTest{
 			parse(1, ArrayStart),
 			parse(1, ArrayStart),
 			parse(1, ArrayStart),
-			skip(5, true),
+			skip(0, 5),
 			parse(1, ArrayEnd),
 			parse(3, ArrayEnd),
 			parse(3, ArrayEnd),
@@ -887,9 +896,8 @@ var skipTests = []parserTest{
 		[]step{
 			parse(1, ArrayStart),
 			parse(1, ObjectStart),
-			skip(2, true),
-			parse(22, ObjectEnd),
-			parse(35, ArrayEnd),
+			skip(1, 1),
+			parse(57, ArrayEnd),
 			end(Done),
 		},
 	},
@@ -899,7 +907,7 @@ var skipTests = []parserTest{
 			parse(1, ObjectStart),
 			parse(1, KeyStart),
 			parse(4, KeyEnd),
-			skip(1, false),
+			skip(0, 1),
 			parse(5, ObjectEnd),
 			end(Done),
 		},
@@ -908,7 +916,7 @@ var skipTests = []parserTest{
 		`null`,
 		[]step{
 			parse(1, NullStart),
-			skip(1, true),
+			skip(1, 0),
 			parse(3, NullEnd),
 			end(Done),
 		},
@@ -921,7 +929,7 @@ var skipTests = []parserTest{
 			parse(1, KeyStart),
 			parse(4, KeyEnd),
 			parse(2, StringStart),
-			skip(3, true),
+			skip(0, 3),
 			parse(4, StringEnd),
 			parse(1, ObjectEnd),
 			parse(4, ArrayEnd),
@@ -936,7 +944,7 @@ var skipTests = []parserTest{
 			parse(1, KeyStart),
 			parse(4, KeyEnd),
 			parse(2, StringStart),
-			skip(1, false),
+			skip(1, 0),
 			parse(5, ObjectEnd),
 			parse(1, ArrayEnd),
 			end(Done),
@@ -948,9 +956,9 @@ var skipTests = []parserTest{
 			parse(1, ArrayStart),
 			parse(1, ArrayStart),
 			parse(1, StringStart),
-			skip(1, false),
+			skip(1, 0),
 			parse(6, ArrayEnd),
-			skip(1, true),
+			skip(0, 1),
 			parse(4, ArrayEnd),
 			end(Done),
 		},
@@ -964,7 +972,7 @@ var skipTests = []parserTest{
 			parse(2, StringStart),
 			parse(4, StringEnd),
 			parse(2, KeyStart),
-			skip(1, true),
+			skip(2, 0),
 			parse(6, SyntaxError),
 		},
 	},
@@ -973,9 +981,21 @@ var skipTests = []parserTest{
 		[]step{
 			parse(1, ArrayStart),
 			parse(1, ArrayStart),
-			skip(1, true),
+			skip(0, 1),
 			parse(1, ArrayEnd),
 			parse(2, ArrayStart),
+			parse(1, ArrayEnd),
+			parse(1, ArrayEnd),
+			end(Done),
+		},
+	},
+	{
+		`[[],[]]`,
+		[]step{
+			parse(1, ArrayStart),
+			parse(1, ArrayStart),
+			skip(1, 0),
+			parse(3, ArrayStart),
 			parse(1, ArrayEnd),
 			parse(1, ArrayEnd),
 			end(Done),
@@ -985,7 +1005,7 @@ var skipTests = []parserTest{
 		`"hello"`,
 		[]step{
 			parse(1, StringStart),
-			skip(1, false),
+			skip(1, 0),
 			parse(6, Continue),
 			end(Done),
 		},
@@ -995,7 +1015,7 @@ var skipTests = []parserTest{
 		[]step{
 			parse(1, ArrayStart),
 			parse(1, StringStart),
-			skip(1, false),
+			skip(1, 0),
 			parse(4, StringStart),
 			parse(2, StringEnd),
 			parse(1, ArrayEnd),

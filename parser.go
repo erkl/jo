@@ -463,7 +463,7 @@ func (p *Parser) Escape(depth int) {
 }
 
 // @todo
-func (p *Parser) Skip(depth int, emitEnds bool) {
+func (p *Parser) Skip(dead, empty int) {
 }
 
 // Convenience function for saving a syntax error.
