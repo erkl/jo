@@ -859,7 +859,7 @@ var skipTests = []parserTest{
 		`{"foo":"bar"}`,
 		[]step{
 			parse(1, ObjectStart),
-			skip(1, 0),
+			skip(0, 1),
 			parse(12, ObjectEnd),
 			end(Done),
 		},
@@ -917,7 +917,7 @@ var skipTests = []parserTest{
 		`null`,
 		[]step{
 			parse(1, NullStart),
-			skip(1, 0),
+			skip(0, 1),
 			parse(3, NullEnd),
 			end(Done),
 		},
