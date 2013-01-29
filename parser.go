@@ -1,6 +1,10 @@
 // Light-weight, event driven JSON parser.
 package jo
 
+import (
+	"errors"
+)
+
 const (
 	_StateValue = iota
 	_StateDone
@@ -53,7 +57,6 @@ const (
 type Parser struct {
 	state int
 	queue []int
-	err   error
 
 	depth      int
 	escape     bool
@@ -63,11 +66,13 @@ type Parser struct {
 
 // Parses a byte slice containing JSON data. Returns the number of bytes
 // read and an appropriate Event.
-func (p *Parser) Parse(input []byte) (int, Event) {
+func (p *Parser) Parse(input []byte) (int, Event, error) {
 	for i := 0; i < len(input); i++ {
-		var event = Continue
-		var s = p.state
-		var b = input[i]
+		event := Continue
+		err := error(nil)
+
+		s := p.state
+		b := input[i]
 
 		if s < _IgnoreSpace && isSpace(b) {
 			continue
@@ -104,7 +109,8 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 				event = NullStart
 				p.state = _StateNull
 			} else {
-				event = p.error(`expected beginning of JSON value`)
+				event = SyntaxError
+				err = errors.New(`expected beginning of JSON value`)
 			}
 
 		case _StateObjectKeyOrBrace:
@@ -124,7 +130,8 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 				p.state = _StateString
 				p.push(_StateObjectKeyDone)
 			} else {
-				event = p.error(`expected object key`)
+				event = SyntaxError
+				err = errors.New(`expected object key`)
 			}
 
 		case _StateObjectKeyDone:
@@ -138,7 +145,8 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 				p.state = _StateValue
 				p.push(_StateObjectCommaOrBrace)
 			} else {
-				event = p.error(`expected ':' after object key`)
+				event = SyntaxError
+				err = errors.New(`expected ':' after object key`)
 			}
 
 		case _StateObjectCommaOrBrace:
@@ -148,7 +156,8 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 				event = ObjectEnd
 				p.state = p.next()
 			} else {
-				event = p.error(`expected ',' or '}' after object value`)
+				event = SyntaxError
+				err = errors.New(`expected ',' or '}' after object value`)
 			}
 
 		case _StateArrayValueOrBracket:
@@ -171,7 +180,8 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 				event = ArrayEnd
 				p.state = p.next()
 			} else {
-				event = p.error(`expected ',' or ']' after array value`)
+				event = SyntaxError
+				err = errors.New(`expected ',' or ']' after array value`)
 			}
 
 		case _StateStringUnicode,
@@ -184,7 +194,8 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 				// character after "\u"
 				p.state++
 			} else {
-				event = p.error(`expected four hexadecimal chars after "\u"`)
+				event = SyntaxError
+				err = errors.New(`expected four hexadecimal chars after "\u"`)
 			}
 
 		case _StateString:
@@ -196,7 +207,8 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 			} else if b == '\\' {
 				p.state = _StateStringEscaped
 			} else if b < 0x20 {
-				event = p.error(`expected valid string character`)
+				event = SyntaxError
+				err = errors.New(`expected valid string character`)
 			}
 
 		case _StateStringDone:
@@ -212,7 +224,8 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 			case 'u':
 				p.state = _StateStringUnicode
 			default:
-				event = p.error(`expected valid escape sequence after '\'`)
+				event = SyntaxError
+				err = errors.New(`expected valid escape sequence after '\'`)
 			}
 
 		case _StateNumberNegative:
@@ -221,7 +234,8 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 			} else if '1' <= b && b <= '9' {
 				p.state = _StateNumber
 			} else {
-				event = p.error(`digit after '-'`)
+				event = SyntaxError
+				err = errors.New(`digit after '-'`)
 			}
 
 		case _StateNumber:
@@ -250,7 +264,8 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 			if isDecimal(b) {
 				p.state = _StateNumberDotDigit
 			} else {
-				event = p.error(`expected digit after dot in number`)
+				event = SyntaxError
+				err = errors.New(`expected digit after dot in number`)
 			}
 
 		case _StateNumberDotDigit:
@@ -274,7 +289,8 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 
 		case _StateNumberExpFirstDigit:
 			if !isDecimal(b) {
-				event = p.error(`expected digit after exponent in number`)
+				event = SyntaxError
+				err = errors.New(`expected digit after exponent in number`)
 			} else {
 				p.state++
 			}
@@ -293,14 +309,16 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 			if b == 'r' {
 				p.state = _StateTrue2
 			} else {
-				event = p.error(`expected 'r' in literal true`)
+				event = SyntaxError
+				err = errors.New(`expected 'r' in literal true`)
 			}
 
 		case _StateTrue2:
 			if b == 'u' {
 				p.state = _StateTrue3
 			} else {
-				return i, p.error(`expected 'u' in literal true`)
+				event = SyntaxError
+				err = errors.New(`expected 'u' in literal true`)
 			}
 
 		case _StateTrue3:
@@ -308,28 +326,32 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 				event = BoolEnd
 				p.state = p.next()
 			} else {
-				return i, p.error(`expected 'e' in literal true`)
+				event = SyntaxError
+				err = errors.New(`expected 'e' in literal true`)
 			}
 
 		case _StateFalse:
 			if b == 'a' {
 				p.state = _StateFalse2
 			} else {
-				event = p.error(`expected 'a' in literal false`)
+				event = SyntaxError
+				err = errors.New(`expected 'a' in literal false`)
 			}
 
 		case _StateFalse2:
 			if b == 'l' {
 				p.state = _StateFalse3
 			} else {
-				event = p.error(`expected 'l' in literal false`)
+				event = SyntaxError
+				err = errors.New(`expected 'l' in literal false`)
 			}
 
 		case _StateFalse3:
 			if b == 's' {
 				p.state = _StateFalse4
 			} else {
-				event = p.error(`expected 's' in literal false`)
+				event = SyntaxError
+				err = errors.New(`expected 's' in literal false`)
 			}
 
 		case _StateFalse4:
@@ -337,21 +359,24 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 				event = BoolEnd
 				p.state = p.next()
 			} else {
-				event = p.error(`expected 'e' in literal false`)
+				event = SyntaxError
+				err = errors.New(`expected 'e' in literal false`)
 			}
 
 		case _StateNull:
 			if b == 'u' {
 				p.state = _StateNull2
 			} else {
-				event = p.error(`expected 'u' in literal false`)
+				event = SyntaxError
+				err = errors.New(`expected 'u' in literal false`)
 			}
 
 		case _StateNull2:
 			if b == 'l' {
 				p.state = _StateNull3
 			} else {
-				event = p.error(`expected 'l' in literal false`)
+				event = SyntaxError
+				err = errors.New(`expected 'l' in literal false`)
 			}
 
 		case _StateNull3:
@@ -359,14 +384,26 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 				event = NullEnd
 				p.state = p.next()
 			} else {
-				event = p.error(`expected 'l' in literal false`)
+				event = SyntaxError
+				err = errors.New(`expected 'l' in literal false`)
 			}
 
 		case _StateDone:
-			return i, p.error(`expected nothing after top-level value`)
+			event = SyntaxError
+			err = errors.New(`expected nothing after top-level value`)
 
 		default:
 			panic(`invalid state`)
+		}
+
+		// if this byte didn't yield an event, try the next
+		if event == Continue {
+			continue
+		}
+
+		// in the case of a syntax error, don't consume the offending byte
+		if event == SyntaxError {
+			return i, SyntaxError, err
 		}
 
 		switch event {
@@ -374,14 +411,6 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 			p.depth++
 		case ObjectEnd, ArrayEnd:
 			p.depth--
-		case SyntaxError:
-			// don't consume the byte that caused the error
-			return i, SyntaxError
-		}
-
-		// if this byte didn't yield an event, try the next
-		if event == Continue {
-			continue
 		}
 
 		if p.escape && p.depth >= p.escapeNext {
@@ -393,10 +422,10 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 			}
 		}
 
-		return i + 1, event
+		return i + 1, event, nil
 	}
 
-	return len(input), Continue
+	return len(input), Continue, nil
 }
 
 // Informs the parser not to expect any further input (most likely caused by
@@ -404,31 +433,19 @@ func (p *Parser) Parse(input []byte) (int, Event) {
 //
 // Returns a SyntaxError event if invoked before the top-level value has been
 // completely parsed. Otherwise returns dangling NumberEnd events, or Done.
-func (p *Parser) End() Event {
+func (p *Parser) End() (Event, error) {
 	switch p.state {
 	case _StateNumberZero,
 		_StateNumber,
 		_StateNumberDotDigit,
 		_StateNumberExpDigit:
 		p.state = _StateDone
-		return NumberEnd
+		return NumberEnd, nil
 	case _StateDone:
-		return Done
+		return Done, nil
 	}
 
-	return p.error(`unexpected end of input`)
-}
-
-// Our own little implementation of the `error` interface.
-type err string
-
-func (e err) Error() string {
-	return string(e)
-}
-
-// Returns the last syntax error detected by the parser, if any.
-func (p *Parser) LastError() error {
-	return p.err
+	return SyntaxError, errors.New(`unexpected end of input`)
 }
 
 // Returns the current depth of nested objects and arrays. Will be 0 for
@@ -464,12 +481,6 @@ func (p *Parser) Escape(depth int) {
 
 // @todo
 func (p *Parser) Skip(dead, empty int) {
-}
-
-// Convenience function for saving a syntax error.
-func (p *Parser) error(s string) Event {
-	p.err = err(s)
-	return SyntaxError
 }
 
 // Puts a new state at the top of the queue.

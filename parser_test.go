@@ -11,13 +11,14 @@ func ExampleParser() {
 	parsed := 0
 
 	for parsed < len(input) {
-		n, event := parser.Parse(input[parsed:])
+		n, event, _ := parser.Parse(input[parsed:])
 		parsed += n
 
 		fmt.Printf("at %2d -> %s\n", parsed, event)
 	}
 
-	fmt.Printf("at %2d -> %s\n", parsed, parser.End())
+	event, _ := parser.End()
+	fmt.Printf("at %2d -> %s\n", parsed, event)
 
 	// Output:
 	// at  1 -> ObjectStart
@@ -35,11 +36,11 @@ type step func(*Parser, []byte) (int, bool, string)
 // returns a function which checks an event returned by Parser.Parser()
 func parse(offset int, want Event) step {
 	return func(p *Parser, in []byte) (int, bool, string) {
-		n, actual := p.Parse(in)
-		log := fmt.Sprintf(".Parse(%#q) -> %d, %s", in, n, actual)
+		n, actual, err := p.Parse(in)
+		log := fmt.Sprintf(".Parse(%#q) -> %d, %s, %#v", in, n, actual, err)
 
 		if n != offset || actual != want {
-			log = log + fmt.Sprintf(" (want %d, %s)", offset, want)
+			log = log + fmt.Sprintf(" (want %d, %s, nil)", offset, want)
 			return n, false, log
 		}
 
@@ -50,11 +51,11 @@ func parse(offset int, want Event) step {
 // returns a function which checks the event returned by Parser.End()
 func end(want Event) step {
 	return func(p *Parser, in []byte) (int, bool, string) {
-		actual := p.End()
-		log := fmt.Sprintf(".End(%#q) -> %s", actual)
+		actual, err := p.End()
+		log := fmt.Sprintf(".End() -> %s, %#v", actual, err)
 
 		if actual != want {
-			log = log + fmt.Sprintf(" (want %s)", actual)
+			log = log + fmt.Sprintf(" (want %s, nil)", actual)
 			return 0, false, log
 		}
 
