@@ -454,33 +454,42 @@ func (p *Parser) Depth() int {
 	return p.depth
 }
 
-// When invoked, Parse() will only return Continue, SyntaxError, ObjectEnd or
-// ArrayEnd events until the object or array `depth` levels up has been fully
-// parsed.
+// Skip provides advanced functionality to skip events, based on the depth of
+// nested objects. It lets the user both drop all start and end events, or
+// only allow the parser to emit end events, until parsing has reached a depth
+// N levels up from where Skip was triggered.
 //
-//   input := []byte(`[{"foo":"bar"}]`
-//    
+// The number of levels to drop or make empty will be applied in order. So in
+// the following example, events for the current level and the one above will
+// be completely dropped. Then, the object/array above that won't emit any
+// more properties/elements. After that object/array, parsing will resume as
+// usual.
+//
+//   p.Skip(2, 1)
+//
+// Here's a more thourough example:
+//
+//   in := []byte(`[{"foo":"bar"},{"numbers":[1,2,3]}]`)
 //   p := Parser{}
-//   p.Parse(input[0:])  // -> (1, ArrayStart)
-//   p.Parse(input[1:])  // -> (1, ObjectStart)
 //    
-//   p.Escape(1)         // we don't care about what's in this object
+//   p.Parse(in[0:])   // -> (1, ArrayStart, nil)
+//   p.Parse(in[1:])   // -> (1, ObjectStart, nil)
 //    
-//   p.Parse(input[2:])  // -> (12, ObjectEnd)
+//   p.Skip(0, 1)      // we don't care about what's in this object;
+//                     // skip all its properties
+//    
+//   p.Parse(in[2:])   // -> (12, ObjectEnd, nil)
+//   p.Parse(in[14:])  // -> (2, ObjectStart, nil)
+//   p.Parse(in[16:])  // -> (1, KeyStart, nil)
+//    
+//   p.Skip(2, 0)      // completely drop this key/value pair, and
+//                     // whatever remains of the parent object
+//    
+//   p.Parse(in[17:])  // -> (18, ArrayEnd, nil)
+//   p.End()           // -> (Done, nil)
 //
-// In the above example, we avoided the KeyStart, KeyEnd, StringStart and
-// StringEnd events that normally would have followed the ObjectStart event.
-//
-// Note that Escape can be invoked at any point - not just after ObjectStart or
-// ArrayStart events.
-func (p *Parser) Escape(depth int) {
-	p.escape = true
-	p.escapeNext = p.depth - 1
-	p.escapeLast = p.depth - depth
-}
-
-// @todo
-func (p *Parser) Skip(dead, empty int) {
+// If drop + empty is greater than the current depth, the function will panic.
+func (p *Parser) Skip(drop, empty int) {
 }
 
 // Puts a new state at the top of the queue.
