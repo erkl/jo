@@ -40,7 +40,7 @@ func parse(offset int, want Event) step {
 		log := fmt.Sprintf(".Parse(%#q) -> %d, %s, %#v", in, n, actual, err)
 
 		if n != offset || actual != want {
-			log = log + fmt.Sprintf(" (want %d, %s, nil)", offset, want)
+			log = log + fmt.Sprintf(" (want %d, %s, <nil>)", offset, want)
 			return n, false, log
 		}
 
@@ -55,7 +55,7 @@ func end(want Event) step {
 		log := fmt.Sprintf(".End() -> %s, %#v", actual, err)
 
 		if actual != want {
-			log = log + fmt.Sprintf(" (want %s, nil)", actual)
+			log = log + fmt.Sprintf(" (want %s, <nil>)", actual)
 			return 0, false, log
 		}
 
@@ -82,7 +82,7 @@ func depth(want int) step {
 func skip(dead, empty int) step {
 	return func(p *Parser, in []byte) (int, bool, string) {
 		p.Skip(dead, empty)
-		log := fmt.Sprintf(".Skip(%d, %v)", depth, end)
+		log := fmt.Sprintf(".Skip(%d, %d)", dead, empty)
 
 		return 0, true, log
 	}
