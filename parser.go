@@ -58,10 +58,12 @@ type Parser struct {
 	state int
 	queue []int
 
-	depth      int
-	escape     bool
-	escapeNext int
-	escapeLast int
+	depth int
+	limit int
+	drop  int
+	empty int
+
+	property bool
 }
 
 // Parses a byte slice containing JSON data. Returns the number of bytes
@@ -410,19 +412,38 @@ func (p *Parser) Parse(input []byte) (int, Event, error) {
 			return i, SyntaxError, err
 		}
 
-		switch event {
-		case ObjectStart, ArrayStart:
+		// make sure p.depth is accurate
+		switch {
+		case event == KeyStart:
 			p.depth++
-		case ObjectEnd, ArrayEnd:
+			p.property = true
+		case ObjectStart <= event && event <= NullStart:
+			if !p.property {
+				p.depth++
+			} else {
+				p.property = false
+			}
+		case ObjectEnd <= event && event <= NullEnd:
 			p.depth--
 		}
 
-		if p.escape && p.depth >= p.escapeNext {
-			if p.depth == p.escapeNext {
-				p.escape = (p.escapeNext > p.escapeLast)
-				p.escapeNext--
-			} else {
+		// determine if we should skip this event
+		if p.drop != 0 || p.empty != 0 {
+			// silence all events for values below the depth limit
+			if p.depth > p.limit {
 				continue
+			}
+
+			p.limit--
+
+			if p.drop > 0 {
+				p.drop--
+				continue
+			} else {
+				p.empty--
+				if event < ObjectEnd && event > NullEnd {
+					continue
+				}
 			}
 		}
 
@@ -492,9 +513,28 @@ func (p *Parser) Depth() int {
 //   p.Parse(in[17:])  // -> (18, ArrayEnd, nil)
 //   p.End()           // -> (Done, nil)
 //
-// Panics on values of drop and empty such that drop + empty is greater than
-// the current depth.
+// Panics when a) either drop or empty is negative, or b) drop + empty is
+// greater than the current depth.
 func (p *Parser) Skip(drop, empty int) {
+	if drop < 0 || empty < 0 {
+		panic(`both drop and empty must be positive`)
+	}
+	if drop+empty > p.depth {
+		panic(`drop + empty must not be greater than the current depth`)
+	}
+
+	// Parser.Skip(1, 0) should be equal to Parser.Skip(0, 1) if invoked inside,
+	// or just after, an object key; it wouldn't make sense to receive an end
+	// event we haven't seen the start of
+	if p.property && drop == 0 && empty > 0 {
+		drop++
+		empty--
+	}
+
+	p.drop = drop
+	p.empty = empty
+
+	p.limit = p.depth - 1
 }
 
 // Puts a new state at the top of the queue.
