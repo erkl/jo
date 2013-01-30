@@ -417,13 +417,13 @@ func (p *Parser) Parse(input []byte) (int, Event, error) {
 		case event == KeyStart:
 			p.depth++
 			p.property = true
-		case ObjectStart <= event && event <= NullStart:
+		case event&(Composite|Primitive) != 0 && event&Start != 0:
 			if !p.property {
 				p.depth++
 			} else {
 				p.property = false
 			}
-		case ObjectEnd <= event && event <= NullEnd:
+		case event&(Composite|Primitive) != 0 && event&End != 0:
 			p.depth--
 		}
 
@@ -441,7 +441,7 @@ func (p *Parser) Parse(input []byte) (int, Event, error) {
 				continue
 			} else {
 				p.empty--
-				if event < ObjectEnd && event > NullEnd {
+				if event&End == 0 {
 					continue
 				}
 			}

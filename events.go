@@ -1,26 +1,36 @@
 package jo
 
 const (
-	Continue Event = iota
-	Done
+	Primitive Event = 1 << iota
+	Composite
+	Start
+	End
 
-	KeyStart
-	ObjectStart
-	ArrayStart
-	StringStart
-	NumberStart
-	BoolStart
-	NullStart
+	shift
+)
 
-	KeyEnd
-	ObjectEnd
-	ArrayEnd
-	StringEnd
-	NumberEnd
-	BoolEnd
-	NullEnd
+const (
+	Continue Event = (iota << uint(shift))
+	Done           = (iota << uint(shift))
 
-	SyntaxError
+	ObjectStart = (iota << uint(shift)) | Composite | Start
+	ObjectEnd   = (iota << uint(shift)) | Composite | End
+	ArrayStart  = (iota << uint(shift)) | Composite | Start
+	ArrayEnd    = (iota << uint(shift)) | Composite | End
+
+	KeyStart = (iota << uint(shift)) | Start
+	KeyEnd   = (iota << uint(shift)) | End
+
+	StringStart = (iota << uint(shift)) | Primitive | Start
+	StringEnd   = (iota << uint(shift)) | Primitive | End
+	NumberStart = (iota << uint(shift)) | Primitive | Start
+	NumberEnd   = (iota << uint(shift)) | Primitive | End
+	BoolStart   = (iota << uint(shift)) | Primitive | Start
+	BoolEnd     = (iota << uint(shift)) | Primitive | End
+	NullStart   = (iota << uint(shift)) | Primitive | Start
+	NullEnd     = (iota << uint(shift)) | Primitive | End
+
+	SyntaxError = (iota << uint(shift))
 )
 
 // Represents a change in parser context.
