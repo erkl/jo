@@ -69,11 +69,8 @@ func (e errorString) Error() string {
 }
 
 // Parses a byte slice containing JSON data. Returns the number of bytes
-// read and an appropriate Event.
-//
-// The third return value will be nil unless the second is a SyntaxError
-// event, in which case it's an error describing the syntax error
-// encountered.
+// read, an appropriate Event and, if the Event was jo.SyntaxError, an
+// error describing the syntax error.
 func (p *Parser) Parse(input []byte) (int, Event, error) {
 	for i := 0; i < len(input); i++ {
 		event := Continue
@@ -481,42 +478,31 @@ func (p *Parser) Depth() int {
 	return p.depth
 }
 
-// Skip provides advanced functionality to skip events, based on the depth of
-// nested objects. It lets the user both drop all start and end events, or
-// only allow the parser to emit end events, until parsing has reached a depth
-// N levels up from where Skip was triggered.
+// Skip is one of jo's more advanced features, providing functionality to
+// silence events based on the depth of nested composite values.
 //
-// The number of levels to drop or make empty will be applied in order. So in
-// the following example, events for the current level and the one above will
-// be completely dropped. Then, the object/array above that won't emit any
-// more properties/elements. After that object/array, parsing will resume as
-// usual.
+//   < [{"foo":"bar"},{"baz":[1,2,3]}]
+//    
+//   > jo.ArrayStart
+//   > jo.ObjectStart
+//    
+//   Skip(0, 1)
+//       skip all key/value pairs in this object ({"foo":"bar"})
+//       but preserve its end event
+//    
+//   > jo.ObjectEnd
+//   > jo.ObjectStart
+//   > jo.KeyStart
+//    
+//   Skip(2, 0)
+//       completely drop this key/value pair ("baz":[1,2,3])
+//       and whatever remains of the object they belong to
+//    
+//   > jo.ArrayEnd
+//   > jo.Done
 //
-//   p.Skip(2, 1)
-//
-// Here's a more thourough example:
-//
-//   in := []byte(`[{"foo":"bar"},{"numbers":[1,2,3]}]`)
-//   p := Parser{}
-//    
-//   p.Parse(in[0:])   // -> (1, ArrayStart, nil)
-//   p.Parse(in[1:])   // -> (1, ObjectStart, nil)
-//    
-//   p.Skip(0, 1)      // we don't care about what's in this object;
-//                     // skip all its properties
-//    
-//   p.Parse(in[2:])   // -> (12, ObjectEnd, nil)
-//   p.Parse(in[14:])  // -> (2, ObjectStart, nil)
-//   p.Parse(in[16:])  // -> (1, KeyStart, nil)
-//    
-//   p.Skip(2, 0)      // completely drop this key/value pair, and
-//                     // whatever remains of the parent object
-//    
-//   p.Parse(in[17:])  // -> (18, ArrayEnd, nil)
-//   p.End()           // -> (Done, nil)
-//
-// Panics when a) either drop or empty is negative, or b) drop + empty is
-// greater than the current depth.
+// Panics if either drop or empty is negative, or if drop + empty overflows
+// the current depth.
 func (p *Parser) Skip(drop, empty int) {
 	if drop < 0 || empty < 0 {
 		panic(`both drop and empty must be positive`)
