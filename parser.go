@@ -64,6 +64,7 @@ type Parser struct {
 
 // Our own, incredibly basic, implementation of the error interface.
 type errorString string
+
 func (e errorString) Error() string {
 	return string(e)
 }
