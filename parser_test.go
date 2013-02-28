@@ -55,7 +55,7 @@ func end(want Event) step {
 		log := fmt.Sprintf(".End() -> %s, %#v", actual, err)
 
 		if actual != want {
-			log = log + fmt.Sprintf(" (want %s, <nil>)", actual)
+			log = log + fmt.Sprintf(" (want %s, <nil>)", want)
 			return 0, false, log
 		}
 
