@@ -431,6 +431,16 @@ var basicTests = []parserTest{
 		},
 	},
 	{
+		`{"a":1`,
+		[]step{
+			parse(1, ObjectStart),
+			parse(1, KeyStart),
+			parse(2, KeyEnd),
+			parse(2, NumberStart),
+			end(SyntaxError),
+		},
+	},
+	{
 		`{"1":1,"2":2}`,
 		[]step{
 			parse(1, ObjectStart),

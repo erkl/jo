@@ -459,14 +459,14 @@ func (p *Parser) Parse(input []byte) (int, Event, error) {
 // NumberEnd events, or Done.
 func (p *Parser) End() (Event, error) {
 	switch p.state {
-	case _StateNumberZero,
-		_StateNumber,
-		_StateNumberDotDigit,
-		_StateNumberExpDigit:
-		p.state = _StateDone
-		return NumberEnd, nil
 	case _StateDone:
 		return Done, nil
+	case _StateNumberZero, _StateNumber,
+		_StateNumberDotDigit, _StateNumberExpDigit:
+		if p.depth == 1 {
+			p.state = _StateDone
+			return NumberEnd, nil
+		}
 	}
 
 	return SyntaxError, errorString(`unexpected EOF`)
