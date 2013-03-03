@@ -526,6 +526,11 @@ func (p *Parser) Skip(drop, empty int) {
 	p.limit = p.depth - 1
 }
 
+// Resets the parser struct to its initial state.
+func (p *Parser) Reset() {
+	*p = Parser{}
+}
+
 // Puts a new state at the top of the queue.
 func (p *Parser) push(state int) {
 	p.queue = append(p.queue, state)
