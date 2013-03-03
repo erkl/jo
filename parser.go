@@ -72,13 +72,13 @@ func (e errorString) Error() string {
 // Parses a byte slice containing JSON data. Returns the number of bytes
 // read, an appropriate Event and, if the Event was jo.SyntaxError, an
 // error describing the syntax error.
-func (p *Parser) Parse(input []byte) (int, Event, error) {
-	for i := 0; i < len(input); i++ {
+func (p *Parser) Next(data []byte) (int, Event, error) {
+	for i := 0; i < len(data); i++ {
 		event := Continue
 		err := error(nil)
 
 		s := p.state
-		b := input[i]
+		b := data[i]
 
 		if s < _IgnoreSpace && isSpace(b) {
 			continue
@@ -95,7 +95,7 @@ func (p *Parser) Parse(input []byte) (int, Event, error) {
 			} else if b == '"' {
 				event = StringStart
 				p.state = _StateString
-				p.push(_StateStringDone)
+				p.pushState(_StateStringDone)
 			} else if b == '-' {
 				event = NumberStart
 				p.state = _StateNumberNegative
@@ -122,7 +122,7 @@ func (p *Parser) Parse(input []byte) (int, Event, error) {
 		case _StateObjectKeyOrBrace:
 			if b == '}' {
 				event = ObjectEnd
-				p.state = p.next()
+				p.state = p.popState()
 				break
 			}
 
@@ -134,7 +134,7 @@ func (p *Parser) Parse(input []byte) (int, Event, error) {
 			if b == '"' {
 				event = KeyStart
 				p.state = _StateString
-				p.push(_StateObjectKeyDone)
+				p.pushState(_StateObjectKeyDone)
 			} else {
 				event = SyntaxError
 				err = errorString(`expected object key`)
@@ -149,7 +149,7 @@ func (p *Parser) Parse(input []byte) (int, Event, error) {
 		case _StateObjectColon:
 			if b == ':' {
 				p.state = _StateValue
-				p.push(_StateObjectCommaOrBrace)
+				p.pushState(_StateObjectCommaOrBrace)
 			} else {
 				event = SyntaxError
 				err = errorString(`expected ':' after object key`)
@@ -160,7 +160,7 @@ func (p *Parser) Parse(input []byte) (int, Event, error) {
 				p.state = _StateObjectKey
 			} else if b == '}' {
 				event = ObjectEnd
-				p.state = p.next()
+				p.state = p.popState()
 			} else {
 				event = SyntaxError
 				err = errorString(`expected ',' or '}' after object value`)
@@ -169,10 +169,10 @@ func (p *Parser) Parse(input []byte) (int, Event, error) {
 		case _StateArrayValueOrBracket:
 			if b == ']' {
 				event = ArrayEnd
-				p.state = p.next()
+				p.state = p.popState()
 			} else {
 				p.state = _StateValue
-				p.push(_StateArrayCommaOrBracket)
+				p.pushState(_StateArrayCommaOrBracket)
 
 				// rewind and let _StateValue parse this byte for us
 				i--
@@ -181,10 +181,10 @@ func (p *Parser) Parse(input []byte) (int, Event, error) {
 		case _StateArrayCommaOrBracket:
 			if b == ',' {
 				p.state = _StateValue
-				p.push(_StateArrayCommaOrBracket)
+				p.pushState(_StateArrayCommaOrBracket)
 			} else if b == ']' {
 				event = ArrayEnd
-				p.state = p.next()
+				p.state = p.popState()
 			} else {
 				event = SyntaxError
 				err = errorString(`expected ',' or ']' after array value`)
@@ -209,7 +209,7 @@ func (p *Parser) Parse(input []byte) (int, Event, error) {
 				// forget we saw the double quote, let the next state
 				// "discover" it instead
 				i--
-				p.state = p.next()
+				p.state = p.popState()
 			} else if b == '\\' {
 				p.state = _StateStringEscaped
 			} else if b < 0x20 {
@@ -221,7 +221,7 @@ func (p *Parser) Parse(input []byte) (int, Event, error) {
 			// we wouldn't be here unless b == '"', so we can avoid
 			// checking it again
 			event = StringEnd
-			p.state = p.next()
+			p.state = p.popState()
 
 		case _StateStringEscaped:
 			switch b {
@@ -259,7 +259,7 @@ func (p *Parser) Parse(input []byte) (int, Event, error) {
 				p.state = _StateNumberExpSign
 			} else {
 				event = NumberEnd
-				p.state = p.next()
+				p.state = p.popState()
 
 				// rewind a byte, because the character we encountered was
 				// not part of the number
@@ -279,7 +279,7 @@ func (p *Parser) Parse(input []byte) (int, Event, error) {
 				p.state = _StateNumberExpSign
 			} else if !isDecimal(b) {
 				event = NumberEnd
-				p.state = p.next()
+				p.state = p.popState()
 
 				// rewind a byte, because the character we encountered was
 				// not part of the number
@@ -304,7 +304,7 @@ func (p *Parser) Parse(input []byte) (int, Event, error) {
 		case _StateNumberExpDigit:
 			if !isDecimal(b) {
 				event = NumberEnd
-				p.state = p.next()
+				p.state = p.popState()
 
 				// rewind a byte, because the character we encountered was
 				// not part of the number
@@ -330,7 +330,7 @@ func (p *Parser) Parse(input []byte) (int, Event, error) {
 		case _StateTrue3:
 			if b == 'e' {
 				event = BoolEnd
-				p.state = p.next()
+				p.state = p.popState()
 			} else {
 				event = SyntaxError
 				err = errorString(`expected 'e' in literal true`)
@@ -363,7 +363,7 @@ func (p *Parser) Parse(input []byte) (int, Event, error) {
 		case _StateFalse4:
 			if b == 'e' {
 				event = BoolEnd
-				p.state = p.next()
+				p.state = p.popState()
 			} else {
 				event = SyntaxError
 				err = errorString(`expected 'e' in literal false`)
@@ -388,7 +388,7 @@ func (p *Parser) Parse(input []byte) (int, Event, error) {
 		case _StateNull3:
 			if b == 'l' {
 				event = NullEnd
-				p.state = p.next()
+				p.state = p.popState()
 			} else {
 				event = SyntaxError
 				err = errorString(`expected 'l' in literal false`)
@@ -450,7 +450,27 @@ func (p *Parser) Parse(input []byte) (int, Event, error) {
 		return i + 1, event, nil
 	}
 
-	return len(input), Continue, nil
+	return len(data), Continue, nil
+}
+
+// Puts a new state at the top of the queue.
+func (p *Parser) pushState(state int) {
+	p.queue = append(p.queue, state)
+}
+
+// Fetches the next state in the queue.
+func (p *Parser) popState() int {
+	length := len(p.queue)
+
+	// if the state queue is empty, the top level value has ended
+	if length == 0 {
+		return _StateDone
+	}
+
+	state := p.queue[length-1]
+	p.queue = p.queue[:length-1]
+
+	return state
 }
 
 // Informs the parser not to expect any further input (EOF).
@@ -482,25 +502,20 @@ func (p *Parser) Depth() int {
 // Skip is one of jo's more advanced features, providing functionality to
 // silence events based on the depth of nested composite values.
 //
-//   < [{"foo":"bar"},{"baz":[1,2,3]}]
-//    
-//   > jo.ArrayStart
-//   > jo.ObjectStart
-//    
-//   Skip(0, 1)
-//       skip all key/value pairs in this object ({"foo":"bar"})
-//       but preserve its end event
-//    
-//   > jo.ObjectEnd
-//   > jo.ObjectStart
-//   > jo.KeyStart
-//    
-//   Skip(2, 0)
-//       completely drop this key/value pair ("baz":[1,2,3])
-//       and whatever remains of the object they belong to
-//    
-//   > jo.ArrayEnd
-//   > jo.Done
+//     < [{"foo":"bar"},{"baz":[1,2,3]}]
+//     > jo.ArrayStart
+//     > jo.ObjectStart
+//     p.Skip(0, 1)
+//         skip all key/value pairs in this object ({"foo":"bar"})
+//         but preserve its end event
+//     > jo.ObjectEnd
+//     > jo.ObjectStart
+//     > jo.KeyStart
+//     p.Skip(2, 0)
+//         completely drop this key/value pair ("baz":[1,2,3])
+//         and whatever remains of the object they belong to
+//     > jo.ArrayEnd
+//     > jo.Done
 //
 // Panics if either drop or empty is negative, or if drop + empty overflows
 // the current depth.
@@ -529,26 +544,6 @@ func (p *Parser) Skip(drop, empty int) {
 // Resets the parser struct to its initial state.
 func (p *Parser) Reset() {
 	*p = Parser{}
-}
-
-// Puts a new state at the top of the queue.
-func (p *Parser) push(state int) {
-	p.queue = append(p.queue, state)
-}
-
-// Fetches the next state in the queue.
-func (p *Parser) next() int {
-	length := len(p.queue)
-
-	// if the state queue is empty, the top level value has ended
-	if length == 0 {
-		return _StateDone
-	}
-
-	state := p.queue[length-1]
-	p.queue = p.queue[:length-1]
-
-	return state
 }
 
 // Returns true if b is a whitespace character.

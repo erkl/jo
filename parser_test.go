@@ -6,12 +6,12 @@ import (
 )
 
 func ExampleParser() {
-	input := []byte(`{ "foo": 10 }`)
+	data := []byte(`{ "foo": 10 }`)
 	parser := Parser{}
 	parsed := 0
 
-	for parsed < len(input) {
-		n, event, _ := parser.Parse(input[parsed:])
+	for parsed < len(data) {
+		n, event, _ := parser.Next(data[parsed:])
 		parsed += n
 
 		fmt.Printf("at %2d -> %s\n", parsed, event)
@@ -36,11 +36,11 @@ type step func(*Parser, []byte) (int, bool, string)
 // returns a function which checks an event returned by Parser.Parser()
 func parse(offset int, want Event) step {
 	return func(p *Parser, in []byte) (int, bool, string) {
-		n, actual, err := p.Parse(in)
-		log := fmt.Sprintf(".Parse(%#q) -> %d, %s, %#v", in, n, actual, err)
+		n, actual, err := p.Next(in)
+		log := fmt.Sprintf(".Next(%#q) -> %d, %s, %#v", in, n, actual, err)
 
 		if n != offset || actual != want {
-			log = log + fmt.Sprintf(" (want %d, %s, <nil>)", offset, want)
+			log += fmt.Sprintf(" (want %d, %s, <nil>)", offset, want)
 			return n, false, log
 		}
 
@@ -55,7 +55,7 @@ func end(want Event) step {
 		log := fmt.Sprintf(".End() -> %s, %#v", actual, err)
 
 		if actual != want {
-			log = log + fmt.Sprintf(" (want %s, <nil>)", want)
+			log += fmt.Sprintf(" (want %s, <nil>)", want)
 			return 0, false, log
 		}
 
@@ -70,7 +70,7 @@ func depth(want int) step {
 		log := fmt.Sprintf(".Depth() -> %d", actual)
 
 		if actual != want {
-			log = log + fmt.Sprintf(" (want %d)", want)
+			log += fmt.Sprintf(" (want %d)", want)
 			return 0, false, log
 		}
 
@@ -79,10 +79,10 @@ func depth(want int) step {
 }
 
 // returns a function which invokes Parser.Skip()
-func skip(dead, empty int) step {
+func skip(drop, empty int) step {
 	return func(p *Parser, in []byte) (int, bool, string) {
-		p.Skip(dead, empty)
-		log := fmt.Sprintf(".Skip(%d, %d)", dead, empty)
+		p.Skip(drop, empty)
+		log := fmt.Sprintf(".Skip(%d, %d)", drop, empty)
 
 		return 0, true, log
 	}
