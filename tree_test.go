@@ -164,3 +164,20 @@ func TestParse(t *testing.T) {
 		}
 	}
 }
+
+func TestNodeMarshalJSON(t *testing.T) {
+	in := ` [ { "a" : { "b" : true, "c" : false } } , [ null , 1.23 ] , [ ] ] `
+	want := `[{"a":{"b":true,"c":false}},[null,1.23],[]]`
+
+	root, err := Parse([]byte(in))
+	if err != nil {
+		t.Fatalf("setup failed")
+	}
+
+	actual, err := root.MarshalJSON()
+	if string(actual) != want || err != nil {
+		t.Errorf("Node.MarshalJSON():")
+		t.Errorf("   got %#q, %v", actual, err)
+		t.Errorf("  want %#q, <nil>", want)
+	}
+}
