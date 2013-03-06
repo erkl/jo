@@ -6,19 +6,19 @@ import (
 )
 
 func ExampleParser() {
-	data := []byte(`{ "foo": 10 }`)
-	parser := Parser{}
-	parsed := 0
+	input := []byte(`{ "foo": 10 }`)
 
-	for parsed < len(data) {
-		n, event, _ := parser.Next(data[parsed:])
-		parsed += n
+	p := Parser{} // no initialization required
+	i := 0
 
-		fmt.Printf("at %2d -> %s\n", parsed, event)
+	for i < len(input) {
+		n, ev, _ := p.Next(input[i:])
+		i += n
+		fmt.Printf("at %2d -> %s\n", i, ev)
 	}
 
-	event, _ := parser.End()
-	fmt.Printf("at %2d -> %s\n", parsed, event)
+	ev, _ := p.End()
+	fmt.Printf("at %2d -> %s\n", i, ev)
 
 	// Output:
 	// at  1 -> ObjectStart
@@ -28,70 +28,6 @@ func ExampleParser() {
 	// at 11 -> NumberEnd
 	// at 13 -> ObjectEnd
 	// at 13 -> Done
-}
-
-// represents a step in a parser test case
-type step func(*Parser, []byte) (int, bool, string)
-
-// returns a function which checks an event returned by Parser.Parser()
-func parse(offset int, want Event) step {
-	return func(p *Parser, in []byte) (int, bool, string) {
-		n, actual, err := p.Next(in)
-		log := fmt.Sprintf(".Next(%#q) -> %d, %s, %#v", in, n, actual, err)
-
-		if n != offset || actual != want {
-			log += fmt.Sprintf(" (want %d, %s, <nil>)", offset, want)
-			return n, false, log
-		}
-
-		return n, true, log
-	}
-}
-
-// returns a function which checks the event returned by Parser.End()
-func end(want Event) step {
-	return func(p *Parser, in []byte) (int, bool, string) {
-		actual, err := p.End()
-		log := fmt.Sprintf(".End() -> %s, %#v", actual, err)
-
-		if actual != want {
-			log += fmt.Sprintf(" (want %s, <nil>)", want)
-			return 0, false, log
-		}
-
-		return 0, true, log
-	}
-}
-
-// returns a function which invokes and checks Parser.Depth()
-func depth(want int) step {
-	return func(p *Parser, in []byte) (int, bool, string) {
-		actual := p.Depth()
-		log := fmt.Sprintf(".Depth() -> %d", actual)
-
-		if actual != want {
-			log += fmt.Sprintf(" (want %d)", want)
-			return 0, false, log
-		}
-
-		return 0, true, log
-	}
-}
-
-// returns a function which invokes Parser.Skip()
-func skip(drop, empty int) step {
-	return func(p *Parser, in []byte) (int, bool, string) {
-		p.Skip(drop, empty)
-		log := fmt.Sprintf(".Skip(%d, %d)", drop, empty)
-
-		return 0, true, log
-	}
-}
-
-// a parser test case
-type parserTest struct {
-	json  string
-	steps []step
 }
 
 // basic parsing tests
@@ -845,13 +781,13 @@ var depthTests = []parserTest{
 	},
 }
 
-// tests involving Parser.Skip()
+// tests involving Parser.Escape()
 var skipTests = []parserTest{
 	{
 		`[]`,
 		[]step{
 			parse(1, ArrayStart),
-			skip(1, 0),
+			escape(1, 0),
 			parse(1, Continue),
 			end(Done),
 		},
@@ -860,7 +796,7 @@ var skipTests = []parserTest{
 		`[]`,
 		[]step{
 			parse(1, ArrayStart),
-			skip(0, 1),
+			escape(0, 1),
 			parse(1, ArrayEnd),
 			end(Done),
 		},
@@ -869,7 +805,7 @@ var skipTests = []parserTest{
 		`{"foo":"bar"}`,
 		[]step{
 			parse(1, ObjectStart),
-			skip(0, 1),
+			escape(0, 1),
 			parse(12, ObjectEnd),
 			end(Done),
 		},
@@ -879,7 +815,7 @@ var skipTests = []parserTest{
 		[]step{
 			parse(1, ArrayStart),
 			parse(1, ArrayStart),
-			skip(0, 2),
+			escape(0, 2),
 			parse(7, ArrayEnd),
 			parse(1, ArrayEnd),
 			end(Done),
@@ -893,7 +829,7 @@ var skipTests = []parserTest{
 			parse(1, ArrayStart),
 			parse(1, ArrayStart),
 			parse(1, ArrayStart),
-			skip(0, 5),
+			escape(0, 5),
 			parse(1, ArrayEnd),
 			parse(3, ArrayEnd),
 			parse(3, ArrayEnd),
@@ -907,7 +843,7 @@ var skipTests = []parserTest{
 		[]step{
 			parse(1, ArrayStart),
 			parse(1, ObjectStart),
-			skip(1, 1),
+			escape(1, 1),
 			parse(57, ArrayEnd),
 			end(Done),
 		},
@@ -918,7 +854,7 @@ var skipTests = []parserTest{
 			parse(1, ObjectStart),
 			parse(1, KeyStart),
 			parse(4, KeyEnd),
-			skip(0, 1),
+			escape(0, 1),
 			parse(5, ObjectEnd),
 			end(Done),
 		},
@@ -927,7 +863,7 @@ var skipTests = []parserTest{
 		`null`,
 		[]step{
 			parse(1, NullStart),
-			skip(0, 1),
+			escape(0, 1),
 			parse(3, NullEnd),
 			end(Done),
 		},
@@ -940,7 +876,7 @@ var skipTests = []parserTest{
 			parse(1, KeyStart),
 			parse(4, KeyEnd),
 			parse(2, StringStart),
-			skip(0, 3),
+			escape(0, 3),
 			parse(4, StringEnd),
 			parse(1, ObjectEnd),
 			parse(4, ArrayEnd),
@@ -955,7 +891,7 @@ var skipTests = []parserTest{
 			parse(1, KeyStart),
 			parse(4, KeyEnd),
 			parse(2, StringStart),
-			skip(1, 0),
+			escape(1, 0),
 			parse(5, ObjectEnd),
 			parse(1, ArrayEnd),
 			end(Done),
@@ -967,9 +903,9 @@ var skipTests = []parserTest{
 			parse(1, ArrayStart),
 			parse(1, ArrayStart),
 			parse(1, StringStart),
-			skip(1, 0),
+			escape(1, 0),
 			parse(6, ArrayEnd),
-			skip(0, 1),
+			escape(0, 1),
 			parse(4, ArrayEnd),
 			end(Done),
 		},
@@ -983,7 +919,7 @@ var skipTests = []parserTest{
 			parse(2, StringStart),
 			parse(4, StringEnd),
 			parse(2, KeyStart),
-			skip(2, 0),
+			escape(2, 0),
 			parse(6, SyntaxError),
 		},
 	},
@@ -992,7 +928,7 @@ var skipTests = []parserTest{
 		[]step{
 			parse(1, ArrayStart),
 			parse(1, ArrayStart),
-			skip(0, 1),
+			escape(0, 1),
 			parse(1, ArrayEnd),
 			parse(2, ArrayStart),
 			parse(1, ArrayEnd),
@@ -1005,7 +941,7 @@ var skipTests = []parserTest{
 		[]step{
 			parse(1, ArrayStart),
 			parse(1, ArrayStart),
-			skip(1, 0),
+			escape(1, 0),
 			parse(3, ArrayStart),
 			parse(1, ArrayEnd),
 			parse(1, ArrayEnd),
@@ -1016,7 +952,7 @@ var skipTests = []parserTest{
 		`"hello"`,
 		[]step{
 			parse(1, StringStart),
-			skip(1, 0),
+			escape(1, 0),
 			parse(6, Continue),
 			end(Done),
 		},
@@ -1026,7 +962,7 @@ var skipTests = []parserTest{
 		[]step{
 			parse(1, ArrayStart),
 			parse(1, StringStart),
-			skip(1, 0),
+			escape(1, 0),
 			parse(4, StringStart),
 			parse(2, StringEnd),
 			parse(1, ArrayEnd),
@@ -1057,5 +993,69 @@ func TestParser(t *testing.T) {
 
 			b = b[n:]
 		}
+	}
+}
+
+// Describes a parser test case.
+type parserTest struct {
+	json  string
+	steps []step
+}
+
+// A function which carries out a step in a test case.
+type step func(*Parser, []byte) (int, bool, string)
+
+// Generates a function which checks an event returned by Parser.Parser().
+func parse(offset int, want Event) step {
+	return func(p *Parser, in []byte) (int, bool, string) {
+		n, actual, err := p.Next(in)
+		log := fmt.Sprintf(".Next(%#q) -> %d, %s, %#v", in, n, actual, err)
+
+		if n != offset || actual != want {
+			log += fmt.Sprintf(" (want %d, %s, <nil>)", offset, want)
+			return n, false, log
+		}
+
+		return n, true, log
+	}
+}
+
+// Generates a function which checks the event returned by Parser.End().
+func end(want Event) step {
+	return func(p *Parser, in []byte) (int, bool, string) {
+		actual, err := p.End()
+		log := fmt.Sprintf(".End() -> %s, %#v", actual, err)
+
+		if actual != want {
+			log += fmt.Sprintf(" (want %s, <nil>)", want)
+			return 0, false, log
+		}
+
+		return 0, true, log
+	}
+}
+
+// Generates a function which invokes and checks Parser.Depth().
+func depth(want int) step {
+	return func(p *Parser, in []byte) (int, bool, string) {
+		actual := p.Depth()
+		log := fmt.Sprintf(".Depth() -> %d", actual)
+
+		if actual != want {
+			log += fmt.Sprintf(" (want %d)", want)
+			return 0, false, log
+		}
+
+		return 0, true, log
+	}
+}
+
+// Generates a function which invokes Parser.Escape().
+func escape(drop, empty int) step {
+	return func(p *Parser, in []byte) (int, bool, string) {
+		p.Escape(drop, empty)
+		log := fmt.Sprintf(".Escape(%d, %d)", drop, empty)
+
+		return 0, true, log
 	}
 }

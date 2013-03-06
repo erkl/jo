@@ -1,435 +1,512 @@
-// Light-weight, event driven JSON parser.
 package jo
 
-const (
-	_StateValue = iota
-	_StateDone
-
-	_StateObjectKeyOrBrace   // {
-	_StateObjectKeyDone      // {"foo
-	_StateObjectColon        // {"foo"
-	_StateObjectCommaOrBrace // {"foo":"bar"
-	_StateObjectKey          // {"foo":"bar",
-
-	_StateArrayValueOrBracket // [
-	_StateArrayCommaOrBracket // ["any value"
-
-	// leading whitespace must be be consumed before any of the above
-	// states are processed
-	_IgnoreSpace
-
-	_StateStringUnicode  // "\u
-	_StateStringUnicode2 // "\u1
-	_StateStringUnicode3 // "\u12
-	_StateStringUnicode4 // "\u123
-	_StateString         // "
-	_StateStringDone     // "foo
-	_StateStringEscaped  // "\
-
-	_StateNumberNegative      // -
-	_StateNumberZero          // 0
-	_StateNumber              // 123
-	_StateNumberDotFirstDigit // 123.
-	_StateNumberDotDigit      // 123.4
-	_StateNumberExpSign       // 123e
-	_StateNumberExpFirstDigit // 123e+
-	_StateNumberExpDigit      // 123e+1
-
-	_StateTrue  // t
-	_StateTrue2 // tr
-	_StateTrue3 // tru
-
-	_StateFalse  // f
-	_StateFalse2 // fa
-	_StateFalse3 // fal
-	_StateFalse4 // fals
-
-	_StateNull  // n
-	_StateNull2 // nu
-	_StateNull3 // nul
+import (
+	"fmt"
 )
 
-// Parser state machine. Requires no initialization before use.
+// Events signal a change in context, for example the start of
+// a string literal.
+type Event int
+
+const (
+	Primitive Event = 1 << (5 + iota)
+	Composite
+	Start
+	End
+)
+
+const (
+	Continue    Event = iota
+	SyntaxError       = iota
+	Done              = iota
+
+	ObjectStart = iota | Composite | Start
+	ObjectEnd   = iota | Composite | End
+	ArrayStart  = iota | Composite | Start
+	ArrayEnd    = iota | Composite | End
+
+	KeyStart = iota | Start
+	KeyEnd   = iota | End
+
+	StringStart = iota | Primitive | Start
+	StringEnd   = iota | Primitive | End
+	NumberStart = iota | Primitive | Start
+	NumberEnd   = iota | Primitive | End
+	BoolStart   = iota | Primitive | Start
+	BoolEnd     = iota | Primitive | End
+	NullStart   = iota | Primitive | Start
+	NullEnd     = iota | Primitive | End
+)
+
+func (e Event) String() string {
+	switch e {
+	case Continue:
+		return "Continue"
+	case SyntaxError:
+		return "SyntaxError"
+	case Done:
+		return "Done"
+	case ObjectStart:
+		return "ObjectStart"
+	case ObjectEnd:
+		return "ObjectEnd"
+	case KeyStart:
+		return "KeyStart"
+	case KeyEnd:
+		return "KeyEnd"
+	case ArrayStart:
+		return "ArrayStart"
+	case ArrayEnd:
+		return "ArrayEnd"
+	case StringStart:
+		return "StringStart"
+	case StringEnd:
+		return "StringEnd"
+	case NumberStart:
+		return "NumberStart"
+	case NumberEnd:
+		return "NumberEnd"
+	case BoolStart:
+		return "BoolStart"
+	case BoolEnd:
+		return "BoolEnd"
+	case NullStart:
+		return "NullStart"
+	case NullEnd:
+		return "NullEnd"
+	}
+	return "<unknown event>"
+}
+
+// The parser state machine. Requires no initialization before use.
 type Parser struct {
 	state int
-	queue []int
+	stack []int
 
-	depth int
-	limit int
-	drop  int
-	empty int
+	depth, limit int
+	drop, empty  int
 
-	property bool
+	key bool
 }
 
-// Our own, incredibly basic, implementation of the error interface.
-type errorString string
+const (
+	_Value int = iota
+	_Done
 
-func (e errorString) Error() string {
-	return string(e)
+	_ObjectKeyOrBrace   // {
+	_ObjectKeyDone      // {"foo
+	_ObjectColon        // {"foo"
+	_ObjectCommaOrBrace // {"foo":"bar"
+	_ObjectKey          // {"foo":"bar",
+
+	_ArrayValueOrBracket // [
+	_ArrayCommaOrBracket // ["any value"
+
+	// leading whitespace must be be consumed before any of
+	// the states listed above are processed
+	__CONSUME_SPACE__
+
+	_StringUnicode  // "\u
+	_StringUnicode2 // "\u1
+	_StringUnicode3 // "\u12
+	_StringUnicode4 // "\u123
+	_String         // "
+	_StringDone     // "foo
+	_StringEscaped  // "\
+
+	_NumberNegative      // -
+	_NumberZero          // 0
+	_Number              // 123
+	_NumberDotFirstDigit // 123.
+	_NumberDotDigit      // 123.4
+	_NumberExpSign       // 123e
+	_NumberExpFirstDigit // 123e+
+	_NumberExpDigit      // 123e+1
+
+	_True  // t
+	_True2 // tr
+	_True3 // tru
+
+	_False  // f
+	_False2 // fa
+	_False3 // fal
+	_False4 // fals
+
+	_Null  // n
+	_Null2 // nu
+	_Null3 // nul
+)
+
+var expected = map[int]string{
+	_Value:               "start of JSON value",
+	_Done:                "end of input",
+	_ObjectKeyOrBrace:    "object key or '}'",
+	_ObjectColon:         "':'",
+	_ObjectCommaOrBrace:  "',' or '}'",
+	_ObjectKey:           "object key",
+	_ArrayValueOrBracket: "array element or ']'",
+	_ArrayCommaOrBracket: "',' or ']'",
+	_StringUnicode:       "hexadecimal digit",
+	_StringUnicode2:      "hexadecimal digit",
+	_StringUnicode3:      "hexadecimal digit",
+	_StringUnicode4:      "hexadecimal digit",
+	_String:              "valid string character or '\"'",
+	_StringEscaped:       "'b', 'f', 'n', 'r', 't', 'u', '\\', '/' or '\"'",
+	_NumberNegative:      "digit",
+	_NumberZero:          "'.', 'e' or 'E'",
+	_NumberDotFirstDigit: "digit",
+	_NumberExpSign:       "'-', '+' or digit",
+	_NumberExpFirstDigit: "digit",
+	_True:                "'r' in literal true",
+	_True2:               "'u' in literal true",
+	_True3:               "'e' in literal true",
+	_False:               "'a' in literal false",
+	_False2:              "'l' in literal false",
+	_False3:              "'s' in literal false",
+	_False4:              "'e' in literal false",
+	_Null:                "'u' in literal null",
+	_Null2:               "'l' in literal null",
+	_Null3:               "'l' in literal null",
 }
 
-// Parses a byte slice containing JSON data. Returns the number of bytes
-// read, an appropriate Event and, if the Event was jo.SyntaxError, an
-// error describing the syntax error.
+// Parses a slice of JSON data, signalling the first change in context by
+// returning the number of bytes read and an appropriate Event. If parsing
+// concludes without any change in parser state, the Continue psuedo-event
+// will be returned instead.
+//
+// When the event returned is SyntaxError, the error return value will describe
+// why parsing failed.
 func (p *Parser) Next(data []byte) (int, Event, error) {
 	for i := 0; i < len(data); i++ {
-		event := Continue
-		err := error(nil)
-
-		s := p.state
+		ev := Continue
 		b := data[i]
 
-		if s < _IgnoreSpace && isSpace(b) {
+		// trim insignificant whitespace
+		if p.state < __CONSUME_SPACE__ && isSpace(b) {
 			continue
 		}
 
-		switch s {
-		case _StateValue:
+		switch p.state {
+		case _Value:
 			if b == '{' {
-				event = ObjectStart
-				p.state = _StateObjectKeyOrBrace
+				ev = ObjectStart
+				p.state = _ObjectKeyOrBrace
 			} else if b == '[' {
-				event = ArrayStart
-				p.state = _StateArrayValueOrBracket
+				ev = ArrayStart
+				p.state = _ArrayValueOrBracket
 			} else if b == '"' {
-				event = StringStart
-				p.state = _StateString
-				p.pushState(_StateStringDone)
+				ev = StringStart
+				p.state = _String
+				p.push(_StringDone)
 			} else if b == '-' {
-				event = NumberStart
-				p.state = _StateNumberNegative
+				ev = NumberStart
+				p.state = _NumberNegative
 			} else if b == '0' {
-				event = NumberStart
-				p.state = _StateNumberZero
+				ev = NumberStart
+				p.state = _NumberZero
 			} else if '1' <= b && b <= '9' {
-				event = NumberStart
-				p.state = _StateNumber
+				ev = NumberStart
+				p.state = _Number
 			} else if b == 't' {
-				event = BoolStart
-				p.state = _StateTrue
+				ev = BoolStart
+				p.state = _True
 			} else if b == 'f' {
-				event = BoolStart
-				p.state = _StateFalse
+				ev = BoolStart
+				p.state = _False
 			} else if b == 'n' {
-				event = NullStart
-				p.state = _StateNull
+				ev = NullStart
+				p.state = _Null
 			} else {
-				event = SyntaxError
-				err = errorString(`expected beginning of JSON value`)
+				goto abort
 			}
 
-		case _StateObjectKeyOrBrace:
+		case _ObjectKeyOrBrace:
 			if b == '}' {
-				event = ObjectEnd
-				p.state = p.popState()
+				ev = ObjectEnd
+				p.state = p.pop()
 				break
 			}
 
 			// if it's not a brace, it must be a key
-			p.state = _StateObjectKey
+			p.state = _ObjectKey
 			fallthrough
 
-		case _StateObjectKey:
+		case _ObjectKey:
 			if b == '"' {
-				event = KeyStart
-				p.state = _StateString
-				p.pushState(_StateObjectKeyDone)
+				ev = KeyStart
+				p.state = _String
+				p.push(_ObjectKeyDone)
 			} else {
-				event = SyntaxError
-				err = errorString(`expected object key`)
+				goto abort
 			}
 
-		case _StateObjectKeyDone:
+		case _ObjectKeyDone:
 			// we wouldn't be here unless b == '"', so we can avoid
 			// checking it again
-			event = KeyEnd
-			p.state = _StateObjectColon
+			ev = KeyEnd
+			p.state = _ObjectColon
 
-		case _StateObjectColon:
+		case _ObjectColon:
 			if b == ':' {
-				p.state = _StateValue
-				p.pushState(_StateObjectCommaOrBrace)
+				p.state = _Value
+				p.push(_ObjectCommaOrBrace)
 			} else {
-				event = SyntaxError
-				err = errorString(`expected ':' after object key`)
+				goto abort
 			}
 
-		case _StateObjectCommaOrBrace:
+		case _ObjectCommaOrBrace:
 			if b == ',' {
-				p.state = _StateObjectKey
+				p.state = _ObjectKey
 			} else if b == '}' {
-				event = ObjectEnd
-				p.state = p.popState()
+				ev = ObjectEnd
+				p.state = p.pop()
 			} else {
-				event = SyntaxError
-				err = errorString(`expected ',' or '}' after object value`)
+				goto abort
 			}
 
-		case _StateArrayValueOrBracket:
+		case _ArrayValueOrBracket:
 			if b == ']' {
-				event = ArrayEnd
-				p.state = p.popState()
+				ev = ArrayEnd
+				p.state = p.pop()
 			} else {
-				p.state = _StateValue
-				p.pushState(_StateArrayCommaOrBracket)
+				p.state = _Value
+				p.push(_ArrayCommaOrBracket)
 
-				// rewind and let _StateValue parse this byte for us
+				// rewind and let _Value parse this byte for us
 				i--
 			}
 
-		case _StateArrayCommaOrBracket:
+		case _ArrayCommaOrBracket:
 			if b == ',' {
-				p.state = _StateValue
-				p.pushState(_StateArrayCommaOrBracket)
+				p.state = _Value
+				p.push(_ArrayCommaOrBracket)
 			} else if b == ']' {
-				event = ArrayEnd
-				p.state = p.popState()
+				ev = ArrayEnd
+				p.state = p.pop()
 			} else {
-				event = SyntaxError
-				err = errorString(`expected ',' or ']' after array value`)
+				goto abort
 			}
 
-		case _StateStringUnicode,
-			_StateStringUnicode2,
-			_StateStringUnicode3,
-			_StateStringUnicode4:
+		case _StringUnicode,
+			_StringUnicode2,
+			_StringUnicode3,
+			_StringUnicode4:
 			if isHex(b) {
 				// move on to the next unicode byte state, or back to
-				// `_StateString` if this was the fourth hexadecimal
+				// `_String` if this was the fourth hexadecimal
 				// character after "\u"
 				p.state++
 			} else {
-				event = SyntaxError
-				err = errorString(`expected four hexadecimal chars after "\u"`)
+				goto abort
 			}
 
-		case _StateString:
+		case _String:
 			if b == '"' {
 				// forget we saw the double quote, let the next state
 				// "discover" it instead
 				i--
-				p.state = p.popState()
+				p.state = p.pop()
 			} else if b == '\\' {
-				p.state = _StateStringEscaped
+				p.state = _StringEscaped
 			} else if b < 0x20 {
-				event = SyntaxError
-				err = errorString(`expected valid string character`)
+				goto abort
 			}
 
-		case _StateStringDone:
+		case _StringDone:
 			// we wouldn't be here unless b == '"', so we can avoid
 			// checking it again
-			event = StringEnd
-			p.state = p.popState()
+			ev = StringEnd
+			p.state = p.pop()
 
-		case _StateStringEscaped:
+		case _StringEscaped:
 			switch b {
 			case 'b', 'f', 'n', 'r', 't', '\\', '/', '"':
-				p.state = _StateString
+				p.state = _String
 			case 'u':
-				p.state = _StateStringUnicode
+				p.state = _StringUnicode
 			default:
-				event = SyntaxError
-				err = errorString(`expected valid escape sequence after '\'`)
+				goto abort
 			}
 
-		case _StateNumberNegative:
+		case _NumberNegative:
 			if b == '0' {
-				p.state = _StateNumberZero
+				p.state = _NumberZero
 			} else if '1' <= b && b <= '9' {
-				p.state = _StateNumber
+				p.state = _Number
 			} else {
-				event = SyntaxError
-				err = errorString(`expected digit after '-'`)
+				goto abort
 			}
 
-		case _StateNumber:
-			if isDecimal(b) {
+		case _Number:
+			if b >= '0' && b <= '9' {
 				break
 			}
-
-			// the same limits apply here as in _StateNumberZero
 			fallthrough
 
-		case _StateNumberZero:
+		case _NumberZero:
 			if b == '.' {
-				p.state = _StateNumberDotFirstDigit
+				p.state = _NumberDotFirstDigit
 			} else if b == 'e' || b == 'E' {
-				p.state = _StateNumberExpSign
+				p.state = _NumberExpSign
 			} else {
-				event = NumberEnd
-				p.state = p.popState()
+				ev = NumberEnd
+				p.state = p.pop()
 
 				// rewind a byte, because the character we encountered was
 				// not part of the number
 				i--
 			}
 
-		case _StateNumberDotFirstDigit:
-			if isDecimal(b) {
-				p.state = _StateNumberDotDigit
+		case _NumberDotFirstDigit:
+			if b >= '0' && b <= '9' {
+				p.state = _NumberDotDigit
 			} else {
-				event = SyntaxError
-				err = errorString(`expected digit after dot in number`)
+				goto abort
 			}
 
-		case _StateNumberDotDigit:
+		case _NumberDotDigit:
 			if b == 'e' || b == 'E' {
-				p.state = _StateNumberExpSign
-			} else if !isDecimal(b) {
-				event = NumberEnd
-				p.state = p.popState()
+				p.state = _NumberExpSign
+			} else if b < '0' || b > '9' {
+				ev = NumberEnd
+				p.state = p.pop()
 
 				// rewind a byte, because the character we encountered was
 				// not part of the number
 				i--
 			}
 
-		case _StateNumberExpSign:
-			p.state = _StateNumberExpFirstDigit
+		case _NumberExpSign:
+			p.state = _NumberExpFirstDigit
 			if b == '+' || b == '-' {
 				break
 			}
 			fallthrough
 
-		case _StateNumberExpFirstDigit:
-			if !isDecimal(b) {
-				event = SyntaxError
-				err = errorString(`expected digit after exponent in number`)
+		case _NumberExpFirstDigit:
+			if b < '0' || b > '9' {
+				goto abort
 			} else {
 				p.state++
 			}
 
-		case _StateNumberExpDigit:
-			if !isDecimal(b) {
-				event = NumberEnd
-				p.state = p.popState()
+		case _NumberExpDigit:
+			if b < '0' || b > '9' {
+				ev = NumberEnd
+				p.state = p.pop()
 
 				// rewind a byte, because the character we encountered was
 				// not part of the number
 				i--
 			}
 
-		case _StateTrue:
+		case _True:
 			if b == 'r' {
-				p.state = _StateTrue2
+				p.state = _True2
 			} else {
-				event = SyntaxError
-				err = errorString(`expected 'r' in literal true`)
+				goto abort
 			}
 
-		case _StateTrue2:
+		case _True2:
 			if b == 'u' {
-				p.state = _StateTrue3
+				p.state = _True3
 			} else {
-				event = SyntaxError
-				err = errorString(`expected 'u' in literal true`)
+				goto abort
 			}
 
-		case _StateTrue3:
+		case _True3:
 			if b == 'e' {
-				event = BoolEnd
-				p.state = p.popState()
+				ev = BoolEnd
+				p.state = p.pop()
 			} else {
-				event = SyntaxError
-				err = errorString(`expected 'e' in literal true`)
+				goto abort
 			}
 
-		case _StateFalse:
+		case _False:
 			if b == 'a' {
-				p.state = _StateFalse2
+				p.state = _False2
 			} else {
-				event = SyntaxError
-				err = errorString(`expected 'a' in literal false`)
+				goto abort
 			}
 
-		case _StateFalse2:
+		case _False2:
 			if b == 'l' {
-				p.state = _StateFalse3
+				p.state = _False3
 			} else {
-				event = SyntaxError
-				err = errorString(`expected 'l' in literal false`)
+				goto abort
 			}
 
-		case _StateFalse3:
+		case _False3:
 			if b == 's' {
-				p.state = _StateFalse4
+				p.state = _False4
 			} else {
-				event = SyntaxError
-				err = errorString(`expected 's' in literal false`)
+				goto abort
 			}
 
-		case _StateFalse4:
+		case _False4:
 			if b == 'e' {
-				event = BoolEnd
-				p.state = p.popState()
+				ev = BoolEnd
+				p.state = p.pop()
 			} else {
-				event = SyntaxError
-				err = errorString(`expected 'e' in literal false`)
+				goto abort
 			}
 
-		case _StateNull:
+		case _Null:
 			if b == 'u' {
-				p.state = _StateNull2
+				p.state = _Null2
 			} else {
-				event = SyntaxError
-				err = errorString(`expected 'u' in literal false`)
+				goto abort
 			}
 
-		case _StateNull2:
+		case _Null2:
 			if b == 'l' {
-				p.state = _StateNull3
+				p.state = _Null3
 			} else {
-				event = SyntaxError
-				err = errorString(`expected 'l' in literal false`)
+				goto abort
 			}
 
-		case _StateNull3:
+		case _Null3:
 			if b == 'l' {
-				event = NullEnd
-				p.state = p.popState()
+				ev = NullEnd
+				p.state = p.pop()
 			} else {
-				event = SyntaxError
-				err = errorString(`expected 'l' in literal false`)
+				goto abort
 			}
 
-		case _StateDone:
-			event = SyntaxError
-			err = errorString(`expected EOF after top-level value`)
+		case _Done:
+			// only whitespace characters are legal after the
+			// top-level value
+			goto abort
 
 		default:
-			panic(`invalid state`)
+			panic("invalid state")
 		}
 
-		// if this byte didn't yield an event, try the next
-		if event == Continue {
+		// if this byte didn't yield an event, continue with
+		// the next one
+		if ev == Continue {
 			continue
 		}
 
-		// in the case of a syntax error, don't consume the offending byte
-		if event == SyntaxError {
-			return i, SyntaxError, err
-		}
-
-		// make sure p.depth is accurate
+		// if the event indicates a change in depth, update p.depth
 		switch {
-		case event == KeyStart:
+		case ev == KeyStart:
 			p.depth++
-			p.property = true
-		case event&(Composite|Primitive) != 0 && event&Start != 0:
-			if !p.property {
-				p.depth++
+			p.key = true
+
+		case ev&(Composite|Primitive) != 0 && ev&Start != 0:
+			if p.key {
+				p.key = false
 			} else {
-				p.property = false
+				p.depth++
 			}
-		case event&(Composite|Primitive) != 0 && event&End != 0:
+
+		case ev&(Composite|Primitive) != 0 && ev&End != 0:
 			p.depth--
 		}
 
-		// determine if we should skip this event
-		if p.drop != 0 || p.empty != 0 {
-			// silence all events for values below the depth limit
+		// determine if we should emit this event or not
+		if p.drop > 0 || p.empty > 0 {
 			if p.depth > p.limit {
 				continue
 			}
@@ -441,85 +518,111 @@ func (p *Parser) Next(data []byte) (int, Event, error) {
 				continue
 			} else {
 				p.empty--
-				if event&End == 0 {
+				if ev&End == 0 {
 					continue
 				}
 			}
 		}
 
-		return i + 1, event, nil
+		return i + 1, ev, nil
+
+	abort:
+		return i, SyntaxError, fmt.Errorf("expected %s, found %q",
+			expected[p.state], b)
 	}
 
 	return len(data), Continue, nil
 }
 
-// Puts a new state at the top of the queue.
-func (p *Parser) pushState(state int) {
-	p.queue = append(p.queue, state)
+// Puts a new state at the top of the stack.
+func (p *Parser) push(state int) {
+	p.stack = append(p.stack, state)
 }
 
 // Fetches the next state in the queue.
-func (p *Parser) popState() int {
-	length := len(p.queue)
+func (p *Parser) pop() int {
+	length := len(p.stack)
 
 	// if the state queue is empty, the top level value has ended
 	if length == 0 {
-		return _StateDone
+		return _Done
 	}
 
-	state := p.queue[length-1]
-	p.queue = p.queue[:length-1]
+	state := p.stack[length-1]
+	p.stack = p.stack[:length-1]
 
 	return state
 }
 
-// Informs the parser not to expect any further input (EOF).
+// Informs the parser not to expect any further input (i.e. EOF).
 //
-// Returns a SyntaxError event and a descriptive error if invoked before the
-// top-level value has been completely parsed. Otherwise returns dangling
-// NumberEnd events, or Done.
+// A SyntaxError event and a relevant error will be returned if the method
+// was invoked before the top-level had been completely parsed. Returns either
+// a NumberEnd or Done event otherwise.
 func (p *Parser) End() (Event, error) {
 	switch p.state {
-	case _StateDone:
+	case _Done:
 		return Done, nil
-	case _StateNumberZero, _StateNumber,
-		_StateNumberDotDigit, _StateNumberExpDigit:
+	case _NumberZero, _Number, _NumberDotDigit, _NumberExpDigit:
 		if p.depth == 1 {
-			p.state = _StateDone
+			p.state = _Done
 			return NumberEnd, nil
 		}
 	}
 
-	return SyntaxError, errorString(`unexpected EOF`)
+	return SyntaxError, fmt.Errorf("expected %s, found end of input",
+		expected[p.state])
 }
 
-// Returns the current depth of nested objects and arrays. Will be 0 for
-// top-level literal values.
+// Resets the parser struct to its initial state. Convenient when parsing a
+// stream of more than one JSON value (simply reset the parser after each Done
+// event).
+func (p *Parser) Reset() {
+	*p = Parser{}
+}
+
+// Returns the current value depth.
 func (p *Parser) Depth() int {
 	return p.depth
 }
 
-// Skip is one of jo's more advanced features, providing functionality to
-// silence events based on the depth of nested composite values.
+// Escape allows the user to silence certain types of events, based on
+// the current depth of nested values.
 //
-//     < [{"foo":"bar"},{"baz":[1,2,3]}]
-//     > jo.ArrayStart
-//     > jo.ObjectStart
-//     p.Skip(0, 1)
-//         skip all key/value pairs in this object ({"foo":"bar"})
-//         but preserve its end event
-//     > jo.ObjectEnd
-//     > jo.ObjectStart
-//     > jo.KeyStart
-//     p.Skip(2, 0)
-//         completely drop this key/value pair ("baz":[1,2,3])
-//         and whatever remains of the object they belong to
-//     > jo.ArrayEnd
-//     > jo.Done
+// Imagine we're parsing the following JSON array.
 //
-// Panics if either drop or empty is negative, or if drop + empty overflows
-// the current depth.
-func (p *Parser) Skip(drop, empty int) {
+//     [{"foo":"bar"},{"baz":[1,2,3]}]
+//
+// The first two events would be the following:
+//
+//     ArrayStart
+//     ObjectStart
+//
+// At this point we've just entered the first object in the top-level array.
+// Let's skip all events inside this object (the end event should still be
+// emitted).
+//
+//     parser.Escape(0, 1)
+//
+// The three next calls to parser.Next() will yield these events:
+//
+//     ObjectEnd
+//     ObjectStart
+//     KeyStart
+//
+// Now we're inside the the second object, and have just received the start
+// event for the "baz" key. At this point we decide that we not only want to
+// drop the "baz" key and its value, but also any other keys in the object,
+// as well as its end event.
+//
+//     parser.Escape(2, 0)
+//
+// If follows that the next two calls to parser.Next() should produce these
+// two events:
+//
+//     ArrayEnd
+//     Done
+func (p *Parser) Escape(drop, empty int) {
 	if drop < 0 || empty < 0 {
 		panic(`both drop and empty must be positive`)
 	}
@@ -527,36 +630,25 @@ func (p *Parser) Skip(drop, empty int) {
 		panic(`drop + empty must not be greater than the current depth`)
 	}
 
-	// Parser.Skip(1, 0) should be equal to Parser.Skip(0, 1) if invoked inside,
-	// or just after, an object key; it wouldn't make sense to receive an end
-	// event we haven't seen the start of
-	if p.property && drop == 0 && empty > 0 {
+	// Parser.Skip(1, 0) should be equal to Parser.Skip(0, 1) if invoked
+	// inside or just after an object key -- it wouldn't make sense to
+	// receive an end event for a value you won't see the start of
+	if p.key && drop == 0 && empty > 0 {
 		drop++
 		empty--
 	}
 
 	p.drop = drop
 	p.empty = empty
-
 	p.limit = p.depth - 1
 }
 
-// Resets the parser struct to its initial state.
-func (p *Parser) Reset() {
-	*p = Parser{}
-}
-
-// Returns true if b is a whitespace character.
 func isSpace(b byte) bool {
 	return b == ' ' || b == '\t' || b == '\n' || b == '\r'
 }
 
-// Returns true if b is a hexadecimal character.
 func isHex(b byte) bool {
-	return isDecimal(b) || ('a' <= b && b <= 'f') || ('A' <= b && b <= 'F')
-}
-
-// Returns true if b is a decimal digit.
-func isDecimal(b byte) bool {
-	return '0' <= b && b <= '9'
+	return (b >= '0' && b <= '9') ||
+		(b >= 'a' && b <= 'f') ||
+		(b >= 'A' && b <= 'F')
 }
