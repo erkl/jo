@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// Indicates the type of value stored in a Node.
+// Type indicates the type of value stored in a Node.
 type Type int
 
 const (
@@ -18,6 +18,7 @@ const (
 	Null   = Type(NullStart)
 )
 
+// String returns the name of the type.
 func (t Type) String() string {
 	switch t {
 	case Object:
@@ -38,7 +39,8 @@ func (t Type) String() string {
 	return "invalid type"
 }
 
-// A Node is an element in a tree of JSON values.
+// Node is a struct describing an element in a tree representation
+// of a JSON value.
 //
 // A tree might look something like this (vertical arrows symbolize Node.Child
 // pointers, and horizontal arrows symbolize Node.Next pointers):
@@ -55,7 +57,7 @@ type Node struct {
 	Next  *Node
 }
 
-// Marshals the value back to JSON.
+// MarshalJSON marshals the node's value back to JSON.
 func (n *Node) MarshalJSON() ([]byte, error) {
 	if n.Type != Object && n.Type != Array {
 		return n.Bytes, nil
@@ -71,7 +73,7 @@ func (n *Node) MarshalJSON() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// Duplicate of io.Writer.
+// Writer is a duplicate of io.Writer.
 type Writer interface {
 	Write(data []byte) (int, error)
 }
@@ -93,7 +95,7 @@ func (n *Node) WriteJSON(w Writer) (int, error) {
 	return total, err
 }
 
-// Marshals the object node n into w.
+// writeObject marshals the node n into w.
 func writeObject(n *Node, w Writer) (int, error) {
 	// write the opening brace
 	total, err := w.Write([]byte{'{'})
@@ -181,7 +183,7 @@ func writeArray(n *Node, w Writer) (int, error) {
 	return total + 1, nil
 }
 
-// Temporary struct for storing state while parsing.
+// marker is a struct for storing temporary state while parsing.
 type marker struct {
 	up    *marker
 	start int
@@ -189,7 +191,7 @@ type marker struct {
 	tail  **Node
 }
 
-// Generates a Node tree representation of the JSON value in data.
+// Parse generates a tree of Nodes, representing the JSON value in data.
 func Parse(data []byte) (*Node, error) {
 	root := (*Node)(nil)
 	top := &marker{nil, 0, nil, &root}

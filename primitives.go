@@ -9,41 +9,42 @@ import (
 )
 
 var (
+	// returned by the ParseFoo functions on failure
 	ErrSyntax   = errors.New("syntax error")
 	ErrRange    = errors.New("out of range")
 	ErrSigned   = errors.New("out of range")
 	ErrFraction = errors.New("not an integer")
 )
 
-// Parses a byte slice into a bool. Fails if the input is not a
-// valid JSON boolean value.
-func ParseBool(bytes []byte) (bool, error) {
-	bytes = trim(bytes)
+// ParseBool interprets a byte slice as a boolean value. Fails if the input
+// is not a valid JSON boolean.
+func ParseBool(data []byte) (bool, error) {
+	data = trim(data)
 
-	if len(bytes) == 4 && bytes[0] == 't' && bytes[1] == 'r' &&
-		bytes[2] == 'u' && bytes[3] == 'e' {
+	if len(data) == 4 && data[0] == 't' && data[1] == 'r' &&
+		data[2] == 'u' && data[3] == 'e' {
 		return true, nil
 	}
-	if len(bytes) == 5 && bytes[0] == 'f' && bytes[1] == 'a' &&
-		bytes[2] == 'l' && bytes[3] == 's' && bytes[4] == 'e' {
+	if len(data) == 5 && data[0] == 'f' && data[1] == 'a' &&
+		data[2] == 'l' && data[3] == 's' && data[4] == 'e' {
 		return false, nil
 	}
 
 	return false, ErrSyntax
 }
 
-// Parses a byte slice as a 64-bit signed integer. Fails if the input
-// is not a valid JSON number, or won't fit in an int64.
-func ParseInt(bytes []byte) (int64, error) {
-	bytes = trim(bytes)
+// ParseUint interprets a byte slice as a 64-bit signed integer. Fails if
+// the input is not a valid JSON number, or won't fit in an int64.
+func ParseInt(data []byte) (int64, error) {
+	data = trim(data)
 
-	if len(bytes) == 0 {
+	if len(data) == 0 {
 		return 0, ErrSyntax
 	}
 
 	// for negative integers, ignore the minus sign
-	if bytes[0] == '-' {
-		unsigned, err := ParseUint(bytes[1:])
+	if data[0] == '-' {
+		unsigned, err := ParseUint(data[1:])
 		if err != nil {
 			if err == ErrSigned {
 				return 0, ErrSyntax
@@ -59,7 +60,7 @@ func ParseInt(bytes []byte) (int64, error) {
 		return -int64(unsigned), nil
 	}
 
-	unsigned, err := ParseUint(bytes)
+	unsigned, err := ParseUint(data)
 	if err != nil {
 		return 0, err
 	}
@@ -72,21 +73,21 @@ func ParseInt(bytes []byte) (int64, error) {
 	return int64(unsigned), nil
 }
 
-// Parses a byte slice as a 64-bit unsigned integer. Fails if the input
-// is not a valid JSON number, or won't fit in a uint64.
-func ParseUint(bytes []byte) (uint64, error) {
-	bytes = trim(bytes)
+// ParseUint interprets a byte slice as a 64-bit unsigned integer. Fails if
+// the input is not a valid JSON number, or won't fit in a uint64.
+func ParseUint(data []byte) (uint64, error) {
+	data = trim(data)
 
 	// very rudimentary error checking
-	if len(bytes) == 0 {
+	if len(data) == 0 {
 		return 0, ErrSyntax
 	}
-	if bytes[0] == '-' {
+	if data[0] == '-' {
 		return 0, ErrSigned
 	}
 
 	// parse the base number
-	base, pow10, rest, err := parseNumBase(bytes)
+	base, pow10, rest, err := parseNumBase(data)
 	if err != nil {
 		return 0, err
 	}
@@ -136,13 +137,13 @@ func ParseUint(bytes []byte) (uint64, error) {
 	return base, nil
 }
 
-// Parses a JSON number's base (e.g. "123" in "123e10").
-func parseNumBase(bytes []byte) (uint64, int, []byte, error) {
+// parseNumBase interprets a JSON number's base (e.g. "123" in "123e10").
+func parseNumBase(data []byte) (uint64, int, []byte, error) {
 	n, e, r, d := uint64(0), 0, 0, -1
 
 	// read all digits (and up to one dot)
-	for ; r < len(bytes); r++ {
-		b := bytes[r]
+	for ; r < len(data); r++ {
+		b := data[r]
 
 		if b < '0' || b > '9' {
 			if b == '.' && d == -1 {
@@ -195,32 +196,32 @@ func parseNumBase(bytes []byte) (uint64, int, []byte, error) {
 		e += 1 + d - r
 	}
 
-	return n, e, bytes[r:], nil
+	return n, e, data[r:], nil
 }
 
-// Parses a JSON number's exponent (e.g. "e10" in "123e10").
-func parseNumExp(bytes []byte) (int, error) {
-	if e := bytes[0]; e != 'e' && e != 'E' {
+// parseNumExp interprets a JSON number's exponent (e.g. "e10" in "123e10").
+func parseNumExp(data []byte) (int, error) {
+	if e := data[0]; e != 'e' && e != 'E' {
 		return 0, ErrSyntax
 	}
 
-	bytes = bytes[1:]
+	data = data[1:]
 
 	// check for the optional sign
-	neg := bytes[0] == '-'
-	if neg || bytes[0] == '+' {
-		bytes = bytes[1:]
+	neg := data[0] == '-'
+	if neg || data[0] == '+' {
+		data = data[1:]
 	}
 
 	// there's at least a chance of finding a digit, right?
-	if len(bytes) == 0 {
+	if len(data) == 0 {
 		return 0, ErrSyntax
 	}
 
 	r, n := 0, 0
 
-	for ; r < len(bytes); r++ {
-		b := bytes[r]
+	for ; r < len(data); r++ {
+		b := data[r]
 
 		// only digits are allowed at this point
 		if b < '0' || b > '9' {
@@ -244,10 +245,10 @@ func parseNumExp(bytes []byte) (int, error) {
 	return n, nil
 }
 
-// Parses a byte slice as a 64-bit float. Fails if the input is not
-// a valid JSON number, or won't fit in a float64.
-func ParseFloat(bytes []byte) (float64, error) {
-	s := string(trim(bytes))
+// ParseFloat interprets the byte slice as a 64-bit float. Fails if the input
+// is not a valid JSON number, or won't fit in a float64.
+func ParseFloat(data []byte) (float64, error) {
+	s := string(trim(data))
 
 	if len(s) == 0 {
 		return 0, ErrSyntax
@@ -274,19 +275,19 @@ func ParseFloat(bytes []byte) (float64, error) {
 
 // Unquote interprets the input byte slice as a JSON string, returning the
 // actual string value. Fails if the input is not a valid JSON number.
-func Unquote(bytes []byte) (string, error) {
-	bytes = trim(bytes)
+func Unquote(data []byte) (string, error) {
+	data = trim(data)
 
-	if len(bytes) < 2 || bytes[0] != '"' || bytes[len(bytes)-1] != '"' {
+	if len(data) < 2 || data[0] != '"' || data[len(data)-1] != '"' {
 		return "", ErrSyntax
 	}
 
-	bytes = bytes[1 : len(bytes)-1]
+	data = data[1 : len(data)-1]
 	r := 0
 
 	// first, check for unusual characters
-	for r < len(bytes) {
-		b := bytes[r]
+	for r < len(data) {
+		b := data[r]
 
 		if b == '\\' || b == '"' || b < ' ' {
 			break
@@ -297,7 +298,7 @@ func Unquote(bytes []byte) (string, error) {
 			continue
 		}
 
-		rr, size := utf8.DecodeRune(bytes[r:])
+		rr, size := utf8.DecodeRune(data[r:])
 		if rr == utf8.RuneError && size == 1 {
 			break
 		}
@@ -306,14 +307,14 @@ func Unquote(bytes []byte) (string, error) {
 
 	// if no tricky characters were found we only have to cast the
 	// input byte slice to a string
-	if r == len(bytes) {
-		return string(bytes), nil
+	if r == len(data) {
+		return string(data), nil
 	}
 
-	buf := make([]byte, len(bytes)+2*utf8.UTFMax)
-	w := copy(buf, bytes[:r])
+	buf := make([]byte, len(data)+2*utf8.UTFMax)
+	w := copy(buf, data[:r])
 
-	for r < len(bytes) {
+	for r < len(data) {
 		// are we out of room?
 		if w >= len(buf)-2*utf8.UTFMax {
 			next := make([]byte, 2*(len(buf)+utf8.UTFMax))
@@ -321,25 +322,25 @@ func Unquote(bytes []byte) (string, error) {
 			buf = next
 		}
 
-		switch b := bytes[r]; {
+		switch b := data[r]; {
 		case b == '\\':
 			r++
-			if r == len(bytes) {
+			if r == len(data) {
 				return "", ErrSyntax
 			}
 
-			b = bytes[r]
+			b = data[r]
 
 			// unicode escape sequences ("\u1234")
 			if b == 'u' {
-				rr := unquoteRune(bytes[r-1:])
+				rr := unquoteRune(data[r-1:])
 				if rr < 0 {
 					return "", ErrSyntax
 				}
 				r += 5
 
 				if utf16.IsSurrogate(rr) {
-					pair := utf16.DecodeRune(rr, unquoteRune(bytes[r:]))
+					pair := utf16.DecodeRune(rr, unquoteRune(data[r:]))
 					if pair != unicode.ReplacementChar {
 						r += 6
 						w += utf8.EncodeRune(buf[w:], pair)
@@ -383,7 +384,7 @@ func Unquote(bytes []byte) (string, error) {
 			w++
 
 		default:
-			rr, size := utf8.DecodeRune(bytes[r:])
+			rr, size := utf8.DecodeRune(data[r:])
 			r += size
 			w += utf8.EncodeRune(buf[w:], rr)
 		}
@@ -392,14 +393,14 @@ func Unquote(bytes []byte) (string, error) {
 	return string(buf[:w]), nil
 }
 
-// Reads a unicode escape sequence ("\u1234") from the beginning of bytes,
-// returning the rune it represents. Returns -1 if one cannot be found.
-func unquoteRune(bytes []byte) (r rune) {
-	if len(bytes) < 6 || bytes[0] != '\\' || bytes[1] != 'u' {
+// unquoteRune reads a unicode escape sequence ("\u1234") from the beginning of
+// data, returning the rune it represents. Returns -1 if one cannot be found.
+func unquoteRune(data []byte) (r rune) {
+	if len(data) < 6 || data[0] != '\\' || data[1] != 'u' {
 		return -1
 	}
 
-	for _, b := range bytes[2:6] {
+	for _, b := range data[2:6] {
 		switch {
 		case '0' <= b && b <= '9':
 			r = r<<4 + rune(b-'0')
@@ -415,19 +416,19 @@ func unquoteRune(bytes []byte) (r rune) {
 	return r
 }
 
-// Removes leading and trailing whitespace from a JSON value.
-func trim(bytes []byte) []byte {
-	for len(bytes) > 0 && isSpace(bytes[0]) {
-		bytes = bytes[1:]
+// trim removes leading and trailing whitespace from a JSON value.
+func trim(data []byte) []byte {
+	for len(data) > 0 && isSpace(data[0]) {
+		data = data[1:]
 	}
 
-	for len(bytes) > 0 {
-		if last := len(bytes) - 1; isSpace(bytes[last]) {
-			bytes = bytes[:last]
+	for len(data) > 0 {
+		if last := len(data) - 1; isSpace(data[last]) {
+			data = data[:last]
 		} else {
 			break
 		}
 	}
 
-	return bytes
+	return data
 }

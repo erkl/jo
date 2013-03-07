@@ -38,6 +38,7 @@ const (
 	NullEnd     = iota | Primitive | End
 )
 
+// String returns the name of the event.
 func (e Event) String() string {
 	switch e {
 	case Continue:
@@ -78,7 +79,8 @@ func (e Event) String() string {
 	return "<unknown event>"
 }
 
-// The parser state machine. Requires no initialization before use.
+// Parser is the state machine used while parsing JSON data. Requires no
+// initialization before use.
 type Parser struct {
 	state int
 	stack []int
@@ -169,8 +171,8 @@ var expected = map[int]string{
 	_Null3:               "'l' in literal null",
 }
 
-// Parses a slice of JSON data, signalling the first change in context by
-// returning the number of bytes read and an appropriate Event. If parsing
+// Next parses a slice of JSON data, signalling the first change in context by
+// returning the number of bytes read and an appropriate event. If parsing
 // concludes without any change in parser state, the Continue psuedo-event
 // will be returned instead.
 //
@@ -534,12 +536,12 @@ func (p *Parser) Next(data []byte) (int, Event, error) {
 	return len(data), Continue, nil
 }
 
-// Puts a new state at the top of the stack.
+// push puts a new state at the top of the stack.
 func (p *Parser) push(state int) {
 	p.stack = append(p.stack, state)
 }
 
-// Fetches the next state in the queue.
+// pop retrieves the top state in the stack.
 func (p *Parser) pop() int {
 	length := len(p.stack)
 
@@ -554,7 +556,7 @@ func (p *Parser) pop() int {
 	return state
 }
 
-// Informs the parser not to expect any further input (i.e. EOF).
+// End informs the parser not to expect any further input (i.e. EOF).
 //
 // A SyntaxError event and a relevant error will be returned if the method
 // was invoked before the top-level had been completely parsed. Returns either
@@ -574,14 +576,14 @@ func (p *Parser) End() (Event, error) {
 		expected[p.state])
 }
 
-// Resets the parser struct to its initial state. Convenient when parsing a
-// stream of more than one JSON value (simply reset the parser after each Done
+// Reset resets the parser struct to its initial state. Convenient when parsing
+// a stream of more than one JSON value (simply reset the parser after each Done
 // event).
 func (p *Parser) Reset() {
 	*p = Parser{}
 }
 
-// Returns the current value depth.
+// Depth returns the current value depth.
 func (p *Parser) Depth() int {
 	return p.depth
 }
