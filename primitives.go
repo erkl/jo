@@ -402,11 +402,11 @@ func unquoteRune(bytes []byte) (r rune) {
 	for _, b := range bytes[2:6] {
 		switch {
 		case '0' <= b && b <= '9':
-			r = 16*r + rune(b-'0')
+			r = r<<4 + rune(b-'0')
 		case 'a' <= b && b <= 'f':
-			r = 16*r + rune(10+b-'a')
+			r = r<<4 + rune(10+b-'a')
 		case 'A' <= b && b <= 'F':
-			r = 16*r + rune(10+b-'A')
+			r = r<<4 + rune(10+b-'A')
 		default:
 			return -1
 		}
