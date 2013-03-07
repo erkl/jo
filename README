@@ -1,3 +1,12 @@
-jo is a light-weight, event-driven JSON parser for Go.
 
-See godoc.org/github.com/wub/jo for details.
+   jo is a Go toolkit for parsing and manipulating JSON data. Use it
+   if you'd like to do either of the following:
+
+       · Parse streaming JSON.
+       · Generate tree-like representations of JSON values.
+       · Remove or rearrange nodes in said trees, then marshal
+         the new structure back to JSON.
+       · Parse JSON primitives to their Go equivalents.
+
+   See godoc.org/github.com/erkl/jo for more.
+
