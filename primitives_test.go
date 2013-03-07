@@ -113,3 +113,49 @@ func TestParseUint(t *testing.T) {
 		}
 	}
 }
+
+var parseFloatTests = []struct {
+	in   string
+	want float64
+	err  error
+}{
+	{``, 0, ErrSyntax},
+	{`10.0`, 10.0, nil},
+	{`12345e10`, 12345e10, nil},
+	{`-102030`, -102030, nil},
+	{`1.7976931348623157e308`, 1.7976931348623157e308, nil},
+	{`-1.7976931348623157e308`, -1.7976931348623157e308, nil},
+	{"1.7976931348623159e308", 0, ErrRange},
+	{"-1.7976931348623159e308", 0, ErrRange},
+	{"1.7976931348623158e308", 1.7976931348623157e+308, nil},
+	{"-1.7976931348623158e308", -1.7976931348623157e+308, nil},
+	{"1.797693134862315808e308", 0, ErrRange},
+	{"-1.797693134862315808e308", 0, ErrRange},
+	{"1e308", 1e+308, nil},
+	{"2e308", 0, ErrRange},
+	{"1e-4294967296", 0, nil},
+	{"1e+4294967296", 0, ErrRange},
+	{"1e-18446744073709551616", 0, nil},
+	{"1e+18446744073709551616", 0, ErrRange},
+	{``, 0, ErrSyntax},
+	{`1.2.3`, 0, ErrSyntax},
+	{`.e1`, 0, ErrSyntax},
+	{"1e", 0, ErrSyntax},
+	{"1e-", 0, ErrSyntax},
+	{".e-1", 0, ErrSyntax},
+	{`+10`, 0, ErrSyntax},
+	{`NaN`, 0, ErrSyntax},
+	{`Inf`, 0, ErrSyntax},
+	{`Infinity`, 0, ErrSyntax},
+}
+
+func TestParseFloat(t *testing.T) {
+	for _, test := range parseFloatTests {
+		got, err := ParseFloat([]byte(test.in))
+		if got != test.want || err != test.err {
+			t.Errorf("ParseFloat(%q):", test.in)
+			t.Errorf("   got %f, %v", got, err)
+			t.Errorf("  want %f, %v", test.want, test.err)
+		}
+	}
+}

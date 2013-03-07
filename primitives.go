@@ -2,6 +2,7 @@ package jo
 
 import (
 	"errors"
+	"strconv"
 )
 
 var (
@@ -238,6 +239,34 @@ func parseNumExp(bytes []byte) (int, error) {
 	}
 
 	return n, nil
+}
+
+// Parses a byte slice as a 64-bit float. Fails if the input is not
+// a valid JSON number, or won't fit in a float64.
+func ParseFloat(bytes []byte) (float64, error) {
+	s := string(trim(bytes))
+
+	if len(s) == 0 {
+		return 0, ErrSyntax
+	}
+
+	// quickly check for values which strconv.ParseFloat will happily parse
+	// for us, but which aren't necessarily valid JSON numbers
+	if f, l := s[0], s[len(s)-1]; f == '+' || l < '0' || l > '9' {
+		return 0, ErrSyntax
+	}
+
+	// float parsing is difficult to get right, so let's reuse the
+	// work of much cleverer people
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		if err.(*strconv.NumError).Err == strconv.ErrRange {
+			return 0, ErrRange
+		}
+		return 0, ErrSyntax
+	}
+
+	return f, nil
 }
 
 // Removes leading and trailing whitespace from a JSON value.
