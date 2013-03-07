@@ -4,6 +4,32 @@ import (
 	"testing"
 )
 
+var parseBoolTests = []struct {
+	in   string
+	want bool
+	err  error
+}{
+	{`true`, true, nil},
+	{` true `, true, nil},
+	{`false`, false, nil},
+	{` false `, false, nil},
+	{``, false, ErrSyntax},
+	{`0`, false, ErrSyntax},
+	{`tru`, false, ErrSyntax},
+	{`alse`, false, ErrSyntax},
+}
+
+func TestParseBool(t *testing.T) {
+	for _, test := range parseBoolTests {
+		got, err := ParseBool([]byte(test.in))
+		if got != test.want || err != test.err {
+			t.Errorf("ParseBool(%q):", test.in)
+			t.Errorf("   got %v, %v", got, err)
+			t.Errorf("  want %v, %v", test.want, test.err)
+		}
+	}
+}
+
 var parseIntTests = []struct {
 	in   string
 	want int64

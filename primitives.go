@@ -11,6 +11,23 @@ var (
 	ErrFraction = errors.New("not an integer")
 )
 
+// Parses a byte slice into a bool. Fails if the input is not a
+// valid JSON boolean value.
+func ParseBool(bytes []byte) (bool, error) {
+	bytes = trim(bytes)
+
+	if len(bytes) == 4 && bytes[0] == 't' && bytes[1] == 'r' &&
+		bytes[2] == 'u' && bytes[3] == 'e' {
+		return true, nil
+	}
+	if len(bytes) == 5 && bytes[0] == 'f' && bytes[1] == 'a' &&
+		bytes[2] == 'l' && bytes[3] == 's' && bytes[4] == 'e' {
+		return false, nil
+	}
+
+	return false, ErrSyntax
+}
+
 // Parses a byte slice as a 64-bit signed integer. Fails if the input
 // is not a valid JSON number, or won't fit in an int64.
 func ParseInt(bytes []byte) (int64, error) {
