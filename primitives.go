@@ -3,6 +3,9 @@ package jo
 import (
 	"errors"
 	"strconv"
+	"unicode"
+	"unicode/utf16"
+	"unicode/utf8"
 )
 
 var (
@@ -267,6 +270,149 @@ func ParseFloat(bytes []byte) (float64, error) {
 	}
 
 	return f, nil
+}
+
+// Unquote interprets the input byte slice as a JSON string, returning the
+// actual string value. Fails if the input is not a valid JSON number.
+func Unquote(bytes []byte) (string, error) {
+	bytes = trim(bytes)
+
+	if len(bytes) < 2 || bytes[0] != '"' || bytes[len(bytes)-1] != '"' {
+		return "", ErrSyntax
+	}
+
+	bytes = bytes[1 : len(bytes)-1]
+	r := 0
+
+	// first, check for unusual characters
+	for r < len(bytes) {
+		b := bytes[r]
+
+		if b == '\\' || b == '"' || b < ' ' {
+			break
+		}
+
+		if b < utf8.RuneSelf {
+			r++
+			continue
+		}
+
+		rr, size := utf8.DecodeRune(bytes[r:])
+		if rr == utf8.RuneError && size == 1 {
+			break
+		}
+		r += size
+	}
+
+	// if no tricky characters were found we only have to cast the
+	// input byte slice to a string
+	if r == len(bytes) {
+		return string(bytes), nil
+	}
+
+	buf := make([]byte, len(bytes)+2*utf8.UTFMax)
+	w := copy(buf, bytes[:r])
+
+	for r < len(bytes) {
+		// are we out of room?
+		if w >= len(buf)-2*utf8.UTFMax {
+			next := make([]byte, 2*(len(buf)+utf8.UTFMax))
+			copy(next, buf[:w])
+			buf = next
+		}
+
+		switch b := bytes[r]; {
+		case b == '\\':
+			r++
+			if r == len(bytes) {
+				return "", ErrSyntax
+			}
+
+			b = bytes[r]
+
+			// unicode escape sequences ("\u1234")
+			if b == 'u' {
+				rr := unquoteRune(bytes[r-1:])
+				if rr < 0 {
+					return "", ErrSyntax
+				}
+				r += 5
+
+				if utf16.IsSurrogate(rr) {
+					pair := utf16.DecodeRune(rr, unquoteRune(bytes[r:]))
+					if pair != unicode.ReplacementChar {
+						r += 6
+						w += utf8.EncodeRune(buf[w:], pair)
+						break
+					}
+
+					// invalid surrogate, fall back to the replacement rune
+					rr = unicode.ReplacementChar
+				}
+
+				w += utf8.EncodeRune(buf[w:], rr)
+				break
+			}
+
+			switch b {
+			case '"', '\\', '/':
+				buf[w] = b
+			case 'b':
+				buf[w] = '\b'
+			case 'f':
+				buf[w] = '\f'
+			case 'n':
+				buf[w] = '\n'
+			case 'r':
+				buf[w] = '\r'
+			case 't':
+				buf[w] = '\t'
+			default:
+				return "", ErrSyntax
+			}
+
+			r++
+			w++
+
+		case b == '"', b < ' ':
+			return "", ErrSyntax
+
+		case b < utf8.RuneSelf:
+			buf[w] = b
+			r++
+			w++
+
+		default:
+			rr, size := utf8.DecodeRune(bytes[r:])
+			r += size
+			w += utf8.EncodeRune(buf[w:], rr)
+		}
+	}
+
+	return string(buf[:w]), nil
+}
+
+// Reads a unicode escape sequence ("\u1234") from the beginning of bytes,
+// returning the rune it represents. Returns -1 if one cannot be found.
+func unquoteRune(bytes []byte) (r rune) {
+	if len(bytes) < 6 || bytes[0] != '\\' || bytes[1] != 'u' {
+		return -1
+	}
+
+	for _, b := range bytes[2:6] {
+		switch {
+		case '0' <= b && b <= '9':
+			r = 16*r + rune(b-'0')
+		case 'a' <= b && b <= 'f':
+			r = 16*r + rune(10+b-'a')
+		case 'A' <= b && b <= 'F':
+			r = 16*r + rune(10+b-'A')
+		default:
+			return -1
+		}
+	}
+
+	return r
 }
 
 // Removes leading and trailing whitespace from a JSON value.

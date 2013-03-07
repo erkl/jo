@@ -159,3 +159,34 @@ func TestParseFloat(t *testing.T) {
 		}
 	}
 }
+
+var unquoteTests = []struct {
+	in   string
+	want string
+	err  error
+}{
+	{`""`, "", nil},
+	{`"abc"`, "abc", nil},
+	{`"\b\f\n\r\t"`, "\b\f\n\r\t", nil},
+	{`"\"\\"`, "\"\\", nil},
+	{`"a\u1234"`, "a\u1234", nil},
+	{`"http:\//"`, "http://", nil},
+	{`"http:\/\/"`, "http://", nil},
+	{`"surrogate: \uD834\uDD1E"`, "surrogate: \U0001D11E", nil},
+	{`"invalid: \uD834x\uDD1E"`, "invalid: \uFFFDx\uFFFD", nil},
+	{`hello`, "", ErrSyntax},
+	{`'c'`, "", ErrSyntax},
+	{`"`, "", ErrSyntax},
+	{`"""`, "", ErrSyntax},
+}
+
+func TestUnquote(t *testing.T) {
+	for _, test := range unquoteTests {
+		got, err := Unquote([]byte(test.in))
+		if got != test.want || err != test.err {
+			t.Errorf("Unquote(%#q):", test.in)
+			t.Errorf("   got %q, %v", got, err)
+			t.Errorf("  want %q, %v", test.want, test.err)
+		}
+	}
+}
