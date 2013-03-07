@@ -6,7 +6,7 @@ import (
 
 var (
 	ErrSyntax   = errors.New("syntax error")
-	ErrOverflow = errors.New("out of range")
+	ErrRange    = errors.New("out of range")
 	ErrSigned   = errors.New("out of range")
 	ErrFraction = errors.New("not an integer")
 )
@@ -49,7 +49,7 @@ func ParseInt(bytes []byte) (int64, error) {
 
 		// make sure the value isn't too great to fit in 63 bits
 		if unsigned > 1<<63 {
-			return 0, ErrOverflow
+			return 0, ErrRange
 		}
 
 		return -int64(unsigned), nil
@@ -62,7 +62,7 @@ func ParseInt(bytes []byte) (int64, error) {
 
 	// watch out for integer overflows
 	if unsigned > 1<<63-1 {
-		return 0, ErrOverflow
+		return 0, ErrRange
 	}
 
 	return int64(unsigned), nil
@@ -124,7 +124,7 @@ func ParseUint(bytes []byte) (uint64, error) {
 	// adjust the base value to account for pow10
 	for ; pow10 > 0; pow10-- {
 		if base*10 < base {
-			return 0, ErrOverflow
+			return 0, ErrRange
 		}
 		base *= 10
 	}
@@ -162,7 +162,7 @@ func parseNumBase(bytes []byte) (uint64, int, []byte, error) {
 		// time to pay for all those zeroes we put off accounting for
 		for ; e > 0; e-- {
 			if n*10 < n {
-				return 0, 0, nil, ErrOverflow
+				return 0, 0, nil, ErrRange
 			}
 			n *= 10
 		}
@@ -170,7 +170,7 @@ func parseNumBase(bytes []byte) (uint64, int, []byte, error) {
 		// guard against integer overflows
 		tmp := n*10 + uint64(b-'0')
 		if tmp < n {
-			return 0, 0, nil, ErrOverflow
+			return 0, 0, nil, ErrRange
 		}
 
 		n = tmp
