@@ -1,6 +1,7 @@
 
-   jo is a Go toolkit for parsing and manipulating JSON data. Use it
-   if you'd like to do either of the following:
+   jo is a Go toolkit for parsing and manipulating JSON data.
+
+   Use it to:
 
        · Parse streaming JSON.
        · Generate tree-like representations of JSON values.
@@ -8,5 +9,5 @@
          the new structure back to JSON.
        · Parse JSON primitives to their Go equivalents.
 
-   See godoc.org/github.com/erkl/jo for more.
+   See http://godoc.org/github.com/erkl/jo for more.
 

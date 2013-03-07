@@ -79,8 +79,8 @@ func (e Event) String() string {
 	return "<unknown event>"
 }
 
-// Parser is the state machine used while parsing JSON data. Requires no
-// initialization before use.
+// Parser is the state machine used while parsing a stream of JSON data.
+// It requires no initialization before use.
 type Parser struct {
 	state int
 	stack []int
