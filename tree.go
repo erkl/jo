@@ -117,6 +117,7 @@ func writeObject(n *Node, w Writer) (int, error) {
 			if err != nil {
 				return total, err
 			}
+			total++
 		}
 
 		// write the child element (either a key or value)
@@ -157,6 +158,7 @@ func writeArray(n *Node, w Writer) (int, error) {
 			if err != nil {
 				return total, err
 			}
+			total++
 		}
 
 		// write the child element
