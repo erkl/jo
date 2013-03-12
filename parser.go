@@ -588,63 +588,6 @@ func (p *Parser) Depth() int {
 	return p.depth
 }
 
-// Escape allows the user to silence certain types of events, based on
-// the current depth of nested values.
-//
-// Imagine we're parsing the following JSON array.
-//
-//     [{"foo":"bar"},{"baz":[1,2,3]}]
-//
-// The first two events would be the following:
-//
-//     ArrayStart
-//     ObjectStart
-//
-// At this point we've just entered the first object in the top-level array.
-// Let's skip all events inside this object (the end event should still be
-// emitted).
-//
-//     parser.Escape(0, 1)
-//
-// The three next calls to parser.Next() will yield these events:
-//
-//     ObjectEnd
-//     ObjectStart
-//     KeyStart
-//
-// Now we're inside the the second object, and have just received the start
-// event for the "baz" key. At this point we decide that we not only want to
-// drop the "baz" key and its value, but also any other keys in the object,
-// as well as its end event.
-//
-//     parser.Escape(2, 0)
-//
-// If follows that the next two calls to parser.Next() should produce these
-// two events:
-//
-//     ArrayEnd
-//     Done
-func (p *Parser) Escape(drop, empty int) {
-	if drop < 0 || empty < 0 {
-		panic(`both drop and empty must be positive`)
-	}
-	if drop+empty > p.depth {
-		panic(`drop + empty must not be greater than the current depth`)
-	}
-
-	// Parser.Skip(1, 0) should be equal to Parser.Skip(0, 1) if invoked
-	// inside or just after an object key -- it wouldn't make sense to
-	// receive an end event for a value you won't see the start of
-	if p.key && drop == 0 && empty > 0 {
-		drop++
-		empty--
-	}
-
-	p.drop = drop
-	p.empty = empty
-	p.limit = p.depth - 1
-}
-
 func isSpace(b byte) bool {
 	return b == ' ' || b == '\t' || b == '\n' || b == '\r'
 }
