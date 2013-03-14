@@ -9,16 +9,16 @@ func ExampleParser() {
 	input := []byte(`{ "foo": 10 }`)
 
 	p := Parser{} // no initialization required
-	i := 0
+	r := 0
 
-	for i < len(input) {
-		n, ev, _ := p.Next(input[i:])
-		i += n
-		fmt.Printf("at %2d -> %s\n", i, ev)
+	for r < len(input) {
+		n, ev, _ := p.Next(input[r:])
+		r += n
+		fmt.Printf("at %2d -> %s\n", r, ev)
 	}
 
 	ev, _ := p.End()
-	fmt.Printf("at %2d -> %s\n", i, ev)
+	fmt.Printf("at %2d -> %s\n", r, ev)
 
 	// Output:
 	// at  1 -> ObjectStart
@@ -30,8 +30,48 @@ func ExampleParser() {
 	// at 13 -> Done
 }
 
-// basic parsing tests
-var basicTests = []parserTest{
+// step is a function which performs part of a test case.
+type step func(*Parser, []byte) (int, bool, string)
+
+// emit generates a function which invokes Parser.Next(), making sure the
+// outcome matches what is expected.
+func emit(offset int, want Event) step {
+	return func(p *Parser, in []byte) (int, bool, string) {
+		n, actual, err := p.Next(in)
+		log := fmt.Sprintf(".Next(%#q) -> %d, %s, %#v", in, n, actual, err)
+
+		if n != offset || actual != want {
+			log += fmt.Sprintf(" (want %d, %s, <nil>)", offset, want)
+			return n, false, log
+		}
+
+		return n, true, log
+	}
+}
+
+// end generates a function which invokes Parser.End(), making sure the
+// outcome matches what is expected.
+func end(want Event) step {
+	return func(p *Parser, in []byte) (int, bool, string) {
+		actual, err := p.End()
+		log := fmt.Sprintf(".End() -> %s, %#v", actual, err)
+
+		if actual != want {
+			log += fmt.Sprintf(" (want %s, <nil>)", want)
+			return 0, false, log
+		}
+
+		return 0, true, log
+	}
+}
+
+// parserTest describes a parser test case.
+type parserTest struct {
+	json  string
+	steps []step
+}
+
+var parserTests = []parserTest{
 	{
 		`""`,
 		[]step{
@@ -737,124 +777,25 @@ var basicTests = []parserTest{
 	},
 }
 
-// tests involving Parser.Depth()
-var depthTests = []parserTest{
-	{
-		`"hello"`,
-		[]step{
-			depth(0),
-			emit(1, StringStart),
-			depth(1),
-			emit(6, StringEnd),
-			end(Done),
-		},
-	},
-	{
-		`{"what":false}`,
-		[]step{
-			emit(1, ObjectStart),
-			depth(1),
-			emit(1, KeyStart),
-			depth(2),
-			emit(5, KeyEnd),
-			depth(2),
-			emit(2, BoolStart),
-			emit(4, BoolEnd),
-			depth(1),
-			emit(1, ObjectEnd),
-			end(Done),
-		},
-	},
-	{
-		`[[[]]]`,
-		[]step{
-			emit(1, ArrayStart),
-			emit(1, ArrayStart),
-			depth(2),
-			emit(1, ArrayStart),
-			emit(1, ArrayEnd),
-			emit(1, ArrayEnd),
-			depth(1),
-			emit(1, ArrayEnd),
-			end(Done),
-		},
-	},
-}
-
 func TestParser(t *testing.T) {
-	tests := make([]parserTest, 0)
-	tests = append(tests, basicTests...)
-	tests = append(tests, depthTests...)
-
-	for _, test := range tests {
+	for _, test := range parserTests {
 		b := []byte(test.json)
-		o := "\np := Parser{}"
 		p := &Parser{}
+
+		// buffer each step's log output, and print them all if
+		// the test case fails
+		output := "\np := Parser{}"
 
 		for i := 0; i < len(test.steps); i++ {
 			n, ok, log := test.steps[i](p, b)
-			o = o + "\np" + log
+			output += "\np" + log
 
 			if !ok {
-				t.Errorf(o)
+				t.Errorf(output)
 				break
 			}
 
 			b = b[n:]
 		}
-	}
-}
-
-// Describes a parser test case.
-type parserTest struct {
-	json  string
-	steps []step
-}
-
-// A function which carries out a step in a test case.
-type step func(*Parser, []byte) (int, bool, string)
-
-// Generates a function which checks an event returned by Parser.Next().
-func emit(offset int, want Event) step {
-	return func(p *Parser, in []byte) (int, bool, string) {
-		n, actual, err := p.Next(in)
-		log := fmt.Sprintf(".Next(%#q) -> %d, %s, %#v", in, n, actual, err)
-
-		if n != offset || actual != want {
-			log += fmt.Sprintf(" (want %d, %s, <nil>)", offset, want)
-			return n, false, log
-		}
-
-		return n, true, log
-	}
-}
-
-// Generates a function which checks the event returned by Parser.End().
-func end(want Event) step {
-	return func(p *Parser, in []byte) (int, bool, string) {
-		actual, err := p.End()
-		log := fmt.Sprintf(".End() -> %s, %#v", actual, err)
-
-		if actual != want {
-			log += fmt.Sprintf(" (want %s, <nil>)", want)
-			return 0, false, log
-		}
-
-		return 0, true, log
-	}
-}
-
-// Generates a function which invokes and checks Parser.Depth().
-func depth(want int) step {
-	return func(p *Parser, in []byte) (int, bool, string) {
-		actual := p.Depth()
-		log := fmt.Sprintf(".Depth() -> %d", actual)
-
-		if actual != want {
-			log += fmt.Sprintf(" (want %d)", want)
-			return 0, false, log
-		}
-
-		return 0, true, log
 	}
 }
