@@ -187,25 +187,25 @@ func (p *Parser) Next(data []byte) (int, Event, error) {
 
 		switch p.state {
 		case stateValue:
-			if b == '{' {
+			if b == '"' {
+				ev = StringStart
+				p.state = stateString
+				p.push(stateStringDone)
+			} else if '1' <= b && b <= '9' {
+				ev = NumberStart
+				p.state = stateNumber
+			} else if b == '{' {
 				ev = ObjectStart
 				p.state = stateObjectKeyOrBrace
 			} else if b == '[' {
 				ev = ArrayStart
 				p.state = stateArrayValueOrBracket
-			} else if b == '"' {
-				ev = StringStart
-				p.state = stateString
-				p.push(stateStringDone)
-			} else if b == '-' {
-				ev = NumberStart
-				p.state = stateNumberNegative
 			} else if b == '0' {
 				ev = NumberStart
 				p.state = stateNumberZero
-			} else if '1' <= b && b <= '9' {
+			} else if b == '-' {
 				ev = NumberStart
-				p.state = stateNumber
+				p.state = stateNumberNegative
 			} else if b == 't' {
 				ev = BoolStart
 				p.state = stateT
