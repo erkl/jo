@@ -84,11 +84,6 @@ func (e Event) String() string {
 type Parser struct {
 	state int
 	stack []int
-
-	depth, limit int
-	drop, empty  int
-
-	key bool
 }
 
 const (
@@ -490,42 +485,6 @@ func (p *Parser) Next(data []byte) (int, Event, error) {
 			continue
 		}
 
-		// if the event indicates a change in depth, update p.depth
-		switch {
-		case ev == KeyStart:
-			p.depth++
-			p.key = true
-
-		case ev&(Composite|Primitive) != 0 && ev&Start != 0:
-			if p.key {
-				p.key = false
-			} else {
-				p.depth++
-			}
-
-		case ev&(Composite|Primitive) != 0 && ev&End != 0:
-			p.depth--
-		}
-
-		// determine if we should emit this event or not
-		if p.drop > 0 || p.empty > 0 {
-			if p.depth > p.limit {
-				continue
-			}
-
-			p.limit--
-
-			if p.drop > 0 {
-				p.drop--
-				continue
-			} else {
-				p.empty--
-				if ev&End == 0 {
-					continue
-				}
-			}
-		}
-
 		return i + 1, ev, nil
 
 	abort:
@@ -566,7 +525,7 @@ func (p *Parser) End() (Event, error) {
 	case _Done:
 		return Done, nil
 	case _NumberZero, _Number, _NumberDotDigit, _NumberExpDigit:
-		if p.depth == 1 {
+		if len(p.stack) == 0 {
 			p.state = _Done
 			return NumberEnd, nil
 		}
@@ -581,11 +540,6 @@ func (p *Parser) End() (Event, error) {
 // event).
 func (p *Parser) Reset() {
 	*p = Parser{}
-}
-
-// Depth returns the current value depth.
-func (p *Parser) Depth() int {
-	return p.depth
 }
 
 func isSpace(b byte) bool {
