@@ -174,9 +174,11 @@ var expected = map[int]string{
 // When the event returned is SyntaxError, the error return value will describe
 // why parsing failed.
 func (p *Parser) Next(data []byte) (int, Event, error) {
-	for i := 0; i < len(data); i++ {
-		ev := Continue
-		b := data[i]
+	var ev Event = Continue
+	var b byte
+
+	for r := 0; r < len(data); r++ {
+		b = data[r]
 
 		// trim insignificant whitespace
 		if p.state < __CONSUME_SPACE__ && isSpace(b) {
@@ -270,7 +272,7 @@ func (p *Parser) Next(data []byte) (int, Event, error) {
 				p.push(stateArrayCommaOrBracket)
 
 				// rewind and let stateValue parse this byte for us
-				i--
+				r--
 			}
 
 		case stateArrayCommaOrBracket:
@@ -312,7 +314,7 @@ func (p *Parser) Next(data []byte) (int, Event, error) {
 			if b == '"' {
 				// forget we saw the double quote, let the next state
 				// "discover" it instead
-				i--
+				r--
 				p.state = p.pop()
 			} else if b == '\\' {
 				p.state = stateStringEsc
@@ -362,7 +364,7 @@ func (p *Parser) Next(data []byte) (int, Event, error) {
 
 				// rewind a byte, because the character we encountered was
 				// not part of the number
-				i--
+				r--
 			}
 
 		case stateNumberDotFirstDigit:
@@ -381,7 +383,7 @@ func (p *Parser) Next(data []byte) (int, Event, error) {
 
 				// rewind a byte, because the character we encountered was
 				// not part of the number
-				i--
+				r--
 			}
 
 		case stateNumberExpSign:
@@ -405,7 +407,7 @@ func (p *Parser) Next(data []byte) (int, Event, error) {
 
 				// rewind a byte, because the character we encountered was
 				// not part of the number
-				i--
+				r--
 			}
 
 		case stateT:
@@ -496,10 +498,10 @@ func (p *Parser) Next(data []byte) (int, Event, error) {
 			continue
 		}
 
-		return i + 1, ev, nil
+		return r + 1, ev, nil
 
 	abort:
-		return i, SyntaxError, fmt.Errorf("expected %s, found %q",
+		return r, SyntaxError, fmt.Errorf("expected %s, found %q",
 			expected[p.state], b)
 	}
 
