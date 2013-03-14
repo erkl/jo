@@ -103,13 +103,13 @@ const (
 	// the states listed above are processed
 	__CONSUME_SPACE__
 
-	stateStringUnicode  // "\u
-	stateStringUnicode2 // "\u1
-	stateStringUnicode3 // "\u12
-	stateStringUnicode4 // "\u123
-	stateString         // "
-	stateStringDone     // "foo
-	stateStringEscaped  // "\
+	stateStringEscU    // "\u
+	stateStringEscU1   // "\u1
+	stateStringEscU12  // "\u12
+	stateStringEscU123 // "\u123
+	stateString        // "
+	stateStringDone    // "foo
+	stateStringEsc     // "\
 
 	stateNumberNegative      // -
 	stateNumberZero          // 0
@@ -120,18 +120,18 @@ const (
 	stateNumberExpFirstDigit // 123e+
 	stateNumberExpDigit      // 123e+1
 
-	stateTrue  // t
-	stateTrue2 // tr
-	stateTrue3 // tru
+	stateT   // t
+	stateTr  // tr
+	stateTru // tru
 
-	stateFalse  // f
-	stateFalse2 // fa
-	stateFalse3 // fal
-	stateFalse4 // fals
+	stateF    // f
+	stateFa   // fa
+	stateFal  // fal
+	stateFals // fals
 
-	stateNull  // n
-	stateNull2 // nu
-	stateNull3 // nul
+	stateN   // n
+	stateNu  // nu
+	stateNul // nul
 )
 
 var expected = map[int]string{
@@ -143,27 +143,27 @@ var expected = map[int]string{
 	stateObjectKey:           "object key",
 	stateArrayValueOrBracket: "array element or ']'",
 	stateArrayCommaOrBracket: "',' or ']'",
-	stateStringUnicode:       "hexadecimal digit",
-	stateStringUnicode2:      "hexadecimal digit",
-	stateStringUnicode3:      "hexadecimal digit",
-	stateStringUnicode4:      "hexadecimal digit",
+	stateStringEscU:          "hexadecimal digit",
+	stateStringEscU1:         "hexadecimal digit",
+	stateStringEscU12:        "hexadecimal digit",
+	stateStringEscU123:       "hexadecimal digit",
 	stateString:              "valid string character or '\"'",
-	stateStringEscaped:       "'b', 'f', 'n', 'r', 't', 'u', '\\', '/' or '\"'",
+	stateStringEsc:           "'b', 'f', 'n', 'r', 't', 'u', '\\', '/' or '\"'",
 	stateNumberNegative:      "digit",
 	stateNumberZero:          "'.', 'e' or 'E'",
 	stateNumberDotFirstDigit: "digit",
 	stateNumberExpSign:       "'-', '+' or digit",
 	stateNumberExpFirstDigit: "digit",
-	stateTrue:                "'r' in literal true",
-	stateTrue2:               "'u' in literal true",
-	stateTrue3:               "'e' in literal true",
-	stateFalse:               "'a' in literal false",
-	stateFalse2:              "'l' in literal false",
-	stateFalse3:              "'s' in literal false",
-	stateFalse4:              "'e' in literal false",
-	stateNull:                "'u' in literal null",
-	stateNull2:               "'l' in literal null",
-	stateNull3:               "'l' in literal null",
+	stateT:                   "'r' in literal true",
+	stateTr:                  "'u' in literal true",
+	stateTru:                 "'e' in literal true",
+	stateF:                   "'a' in literal false",
+	stateFa:                  "'l' in literal false",
+	stateFal:                 "'s' in literal false",
+	stateFals:                "'e' in literal false",
+	stateN:                   "'u' in literal null",
+	stateNu:                  "'l' in literal null",
+	stateNul:                 "'l' in literal null",
 }
 
 // Next parses a slice of JSON data, signalling the first change in context by
@@ -206,13 +206,13 @@ func (p *Parser) Next(data []byte) (int, Event, error) {
 				p.state = stateNumber
 			} else if b == 't' {
 				ev = BoolStart
-				p.state = stateTrue
+				p.state = stateT
 			} else if b == 'f' {
 				ev = BoolStart
-				p.state = stateFalse
+				p.state = stateF
 			} else if b == 'n' {
 				ev = NullStart
-				p.state = stateNull
+				p.state = stateN
 			} else {
 				goto abort
 			}
@@ -284,18 +284,29 @@ func (p *Parser) Next(data []byte) (int, Event, error) {
 				goto abort
 			}
 
-		case stateStringUnicode,
-			stateStringUnicode2,
-			stateStringUnicode3,
-			stateStringUnicode4:
-			if isHex(b) {
-				// move on to the next unicode byte state, or back to
-				// `stateString` if this was the fourth hexadecimal
-				// character after "\u"
-				p.state++
-			} else {
+		case stateStringEscU:
+			if !isHex(b) {
 				goto abort
 			}
+			p.state = stateStringEscU1
+
+		case stateStringEscU1:
+			if !isHex(b) {
+				goto abort
+			}
+			p.state = stateStringEscU12
+
+		case stateStringEscU12:
+			if !isHex(b) {
+				goto abort
+			}
+			p.state = stateStringEscU123
+
+		case stateStringEscU123:
+			if !isHex(b) {
+				goto abort
+			}
+			p.state = stateString
 
 		case stateString:
 			if b == '"' {
@@ -304,7 +315,7 @@ func (p *Parser) Next(data []byte) (int, Event, error) {
 				i--
 				p.state = p.pop()
 			} else if b == '\\' {
-				p.state = stateStringEscaped
+				p.state = stateStringEsc
 			} else if b < 0x20 {
 				goto abort
 			}
@@ -315,12 +326,12 @@ func (p *Parser) Next(data []byte) (int, Event, error) {
 			ev = StringEnd
 			p.state = p.pop()
 
-		case stateStringEscaped:
+		case stateStringEsc:
 			switch b {
 			case 'b', 'f', 'n', 'r', 't', '\\', '/', '"':
 				p.state = stateString
 			case 'u':
-				p.state = stateStringUnicode
+				p.state = stateStringEscU
 			default:
 				goto abort
 			}
@@ -397,21 +408,21 @@ func (p *Parser) Next(data []byte) (int, Event, error) {
 				i--
 			}
 
-		case stateTrue:
+		case stateT:
 			if b == 'r' {
-				p.state = stateTrue2
+				p.state = stateTr
 			} else {
 				goto abort
 			}
 
-		case stateTrue2:
+		case stateTr:
 			if b == 'u' {
-				p.state = stateTrue3
+				p.state = stateTru
 			} else {
 				goto abort
 			}
 
-		case stateTrue3:
+		case stateTru:
 			if b == 'e' {
 				ev = BoolEnd
 				p.state = p.pop()
@@ -419,28 +430,28 @@ func (p *Parser) Next(data []byte) (int, Event, error) {
 				goto abort
 			}
 
-		case stateFalse:
+		case stateF:
 			if b == 'a' {
-				p.state = stateFalse2
+				p.state = stateFa
 			} else {
 				goto abort
 			}
 
-		case stateFalse2:
+		case stateFa:
 			if b == 'l' {
-				p.state = stateFalse3
+				p.state = stateFal
 			} else {
 				goto abort
 			}
 
-		case stateFalse3:
+		case stateFal:
 			if b == 's' {
-				p.state = stateFalse4
+				p.state = stateFals
 			} else {
 				goto abort
 			}
 
-		case stateFalse4:
+		case stateFals:
 			if b == 'e' {
 				ev = BoolEnd
 				p.state = p.pop()
@@ -448,21 +459,21 @@ func (p *Parser) Next(data []byte) (int, Event, error) {
 				goto abort
 			}
 
-		case stateNull:
+		case stateN:
 			if b == 'u' {
-				p.state = stateNull2
+				p.state = stateNu
 			} else {
 				goto abort
 			}
 
-		case stateNull2:
+		case stateNu:
 			if b == 'l' {
-				p.state = stateNull3
+				p.state = stateNul
 			} else {
 				goto abort
 			}
 
-		case stateNull3:
+		case stateNul:
 			if b == 'l' {
 				ev = NullEnd
 				p.state = p.pop()
