@@ -87,83 +87,83 @@ type Parser struct {
 }
 
 const (
-	_Value int = iota
-	_Done
+	stateValue int = iota
+	stateDone
 
-	_ObjectKeyOrBrace   // {
-	_ObjectKeyDone      // {"foo
-	_ObjectColon        // {"foo"
-	_ObjectCommaOrBrace // {"foo":"bar"
-	_ObjectKey          // {"foo":"bar",
+	stateObjectKeyOrBrace   // {
+	stateObjectKeyDone      // {"foo
+	stateObjectColon        // {"foo"
+	stateObjectCommaOrBrace // {"foo":"bar"
+	stateObjectKey          // {"foo":"bar",
 
-	_ArrayValueOrBracket // [
-	_ArrayCommaOrBracket // ["any value"
+	stateArrayValueOrBracket // [
+	stateArrayCommaOrBracket // ["any value"
 
 	// leading whitespace must be be consumed before any of
 	// the states listed above are processed
 	__CONSUME_SPACE__
 
-	_StringUnicode  // "\u
-	_StringUnicode2 // "\u1
-	_StringUnicode3 // "\u12
-	_StringUnicode4 // "\u123
-	_String         // "
-	_StringDone     // "foo
-	_StringEscaped  // "\
+	stateStringUnicode  // "\u
+	stateStringUnicode2 // "\u1
+	stateStringUnicode3 // "\u12
+	stateStringUnicode4 // "\u123
+	stateString         // "
+	stateStringDone     // "foo
+	stateStringEscaped  // "\
 
-	_NumberNegative      // -
-	_NumberZero          // 0
-	_Number              // 123
-	_NumberDotFirstDigit // 123.
-	_NumberDotDigit      // 123.4
-	_NumberExpSign       // 123e
-	_NumberExpFirstDigit // 123e+
-	_NumberExpDigit      // 123e+1
+	stateNumberNegative      // -
+	stateNumberZero          // 0
+	stateNumber              // 123
+	stateNumberDotFirstDigit // 123.
+	stateNumberDotDigit      // 123.4
+	stateNumberExpSign       // 123e
+	stateNumberExpFirstDigit // 123e+
+	stateNumberExpDigit      // 123e+1
 
-	_True  // t
-	_True2 // tr
-	_True3 // tru
+	stateTrue  // t
+	stateTrue2 // tr
+	stateTrue3 // tru
 
-	_False  // f
-	_False2 // fa
-	_False3 // fal
-	_False4 // fals
+	stateFalse  // f
+	stateFalse2 // fa
+	stateFalse3 // fal
+	stateFalse4 // fals
 
-	_Null  // n
-	_Null2 // nu
-	_Null3 // nul
+	stateNull  // n
+	stateNull2 // nu
+	stateNull3 // nul
 )
 
 var expected = map[int]string{
-	_Value:               "start of JSON value",
-	_Done:                "end of input",
-	_ObjectKeyOrBrace:    "object key or '}'",
-	_ObjectColon:         "':'",
-	_ObjectCommaOrBrace:  "',' or '}'",
-	_ObjectKey:           "object key",
-	_ArrayValueOrBracket: "array element or ']'",
-	_ArrayCommaOrBracket: "',' or ']'",
-	_StringUnicode:       "hexadecimal digit",
-	_StringUnicode2:      "hexadecimal digit",
-	_StringUnicode3:      "hexadecimal digit",
-	_StringUnicode4:      "hexadecimal digit",
-	_String:              "valid string character or '\"'",
-	_StringEscaped:       "'b', 'f', 'n', 'r', 't', 'u', '\\', '/' or '\"'",
-	_NumberNegative:      "digit",
-	_NumberZero:          "'.', 'e' or 'E'",
-	_NumberDotFirstDigit: "digit",
-	_NumberExpSign:       "'-', '+' or digit",
-	_NumberExpFirstDigit: "digit",
-	_True:                "'r' in literal true",
-	_True2:               "'u' in literal true",
-	_True3:               "'e' in literal true",
-	_False:               "'a' in literal false",
-	_False2:              "'l' in literal false",
-	_False3:              "'s' in literal false",
-	_False4:              "'e' in literal false",
-	_Null:                "'u' in literal null",
-	_Null2:               "'l' in literal null",
-	_Null3:               "'l' in literal null",
+	stateValue:               "start of JSON value",
+	stateDone:                "end of input",
+	stateObjectKeyOrBrace:    "object key or '}'",
+	stateObjectColon:         "':'",
+	stateObjectCommaOrBrace:  "',' or '}'",
+	stateObjectKey:           "object key",
+	stateArrayValueOrBracket: "array element or ']'",
+	stateArrayCommaOrBracket: "',' or ']'",
+	stateStringUnicode:       "hexadecimal digit",
+	stateStringUnicode2:      "hexadecimal digit",
+	stateStringUnicode3:      "hexadecimal digit",
+	stateStringUnicode4:      "hexadecimal digit",
+	stateString:              "valid string character or '\"'",
+	stateStringEscaped:       "'b', 'f', 'n', 'r', 't', 'u', '\\', '/' or '\"'",
+	stateNumberNegative:      "digit",
+	stateNumberZero:          "'.', 'e' or 'E'",
+	stateNumberDotFirstDigit: "digit",
+	stateNumberExpSign:       "'-', '+' or digit",
+	stateNumberExpFirstDigit: "digit",
+	stateTrue:                "'r' in literal true",
+	stateTrue2:               "'u' in literal true",
+	stateTrue3:               "'e' in literal true",
+	stateFalse:               "'a' in literal false",
+	stateFalse2:              "'l' in literal false",
+	stateFalse3:              "'s' in literal false",
+	stateFalse4:              "'e' in literal false",
+	stateNull:                "'u' in literal null",
+	stateNull2:               "'l' in literal null",
+	stateNull3:               "'l' in literal null",
 }
 
 // Next parses a slice of JSON data, signalling the first change in context by
@@ -184,40 +184,40 @@ func (p *Parser) Next(data []byte) (int, Event, error) {
 		}
 
 		switch p.state {
-		case _Value:
+		case stateValue:
 			if b == '{' {
 				ev = ObjectStart
-				p.state = _ObjectKeyOrBrace
+				p.state = stateObjectKeyOrBrace
 			} else if b == '[' {
 				ev = ArrayStart
-				p.state = _ArrayValueOrBracket
+				p.state = stateArrayValueOrBracket
 			} else if b == '"' {
 				ev = StringStart
-				p.state = _String
-				p.push(_StringDone)
+				p.state = stateString
+				p.push(stateStringDone)
 			} else if b == '-' {
 				ev = NumberStart
-				p.state = _NumberNegative
+				p.state = stateNumberNegative
 			} else if b == '0' {
 				ev = NumberStart
-				p.state = _NumberZero
+				p.state = stateNumberZero
 			} else if '1' <= b && b <= '9' {
 				ev = NumberStart
-				p.state = _Number
+				p.state = stateNumber
 			} else if b == 't' {
 				ev = BoolStart
-				p.state = _True
+				p.state = stateTrue
 			} else if b == 'f' {
 				ev = BoolStart
-				p.state = _False
+				p.state = stateFalse
 			} else if b == 'n' {
 				ev = NullStart
-				p.state = _Null
+				p.state = stateNull
 			} else {
 				goto abort
 			}
 
-		case _ObjectKeyOrBrace:
+		case stateObjectKeyOrBrace:
 			if b == '}' {
 				ev = ObjectEnd
 				p.state = p.pop()
@@ -225,35 +225,35 @@ func (p *Parser) Next(data []byte) (int, Event, error) {
 			}
 
 			// if it's not a brace, it must be a key
-			p.state = _ObjectKey
+			p.state = stateObjectKey
 			fallthrough
 
-		case _ObjectKey:
+		case stateObjectKey:
 			if b == '"' {
 				ev = KeyStart
-				p.state = _String
-				p.push(_ObjectKeyDone)
+				p.state = stateString
+				p.push(stateObjectKeyDone)
 			} else {
 				goto abort
 			}
 
-		case _ObjectKeyDone:
+		case stateObjectKeyDone:
 			// we wouldn't be here unless b == '"', so we can avoid
 			// checking it again
 			ev = KeyEnd
-			p.state = _ObjectColon
+			p.state = stateObjectColon
 
-		case _ObjectColon:
+		case stateObjectColon:
 			if b == ':' {
-				p.state = _Value
-				p.push(_ObjectCommaOrBrace)
+				p.state = stateValue
+				p.push(stateObjectCommaOrBrace)
 			} else {
 				goto abort
 			}
 
-		case _ObjectCommaOrBrace:
+		case stateObjectCommaOrBrace:
 			if b == ',' {
-				p.state = _ObjectKey
+				p.state = stateObjectKey
 			} else if b == '}' {
 				ev = ObjectEnd
 				p.state = p.pop()
@@ -261,22 +261,22 @@ func (p *Parser) Next(data []byte) (int, Event, error) {
 				goto abort
 			}
 
-		case _ArrayValueOrBracket:
+		case stateArrayValueOrBracket:
 			if b == ']' {
 				ev = ArrayEnd
 				p.state = p.pop()
 			} else {
-				p.state = _Value
-				p.push(_ArrayCommaOrBracket)
+				p.state = stateValue
+				p.push(stateArrayCommaOrBracket)
 
-				// rewind and let _Value parse this byte for us
+				// rewind and let stateValue parse this byte for us
 				i--
 			}
 
-		case _ArrayCommaOrBracket:
+		case stateArrayCommaOrBracket:
 			if b == ',' {
-				p.state = _Value
-				p.push(_ArrayCommaOrBracket)
+				p.state = stateValue
+				p.push(stateArrayCommaOrBracket)
 			} else if b == ']' {
 				ev = ArrayEnd
 				p.state = p.pop()
@@ -284,67 +284,67 @@ func (p *Parser) Next(data []byte) (int, Event, error) {
 				goto abort
 			}
 
-		case _StringUnicode,
-			_StringUnicode2,
-			_StringUnicode3,
-			_StringUnicode4:
+		case stateStringUnicode,
+			stateStringUnicode2,
+			stateStringUnicode3,
+			stateStringUnicode4:
 			if isHex(b) {
 				// move on to the next unicode byte state, or back to
-				// `_String` if this was the fourth hexadecimal
+				// `stateString` if this was the fourth hexadecimal
 				// character after "\u"
 				p.state++
 			} else {
 				goto abort
 			}
 
-		case _String:
+		case stateString:
 			if b == '"' {
 				// forget we saw the double quote, let the next state
 				// "discover" it instead
 				i--
 				p.state = p.pop()
 			} else if b == '\\' {
-				p.state = _StringEscaped
+				p.state = stateStringEscaped
 			} else if b < 0x20 {
 				goto abort
 			}
 
-		case _StringDone:
+		case stateStringDone:
 			// we wouldn't be here unless b == '"', so we can avoid
 			// checking it again
 			ev = StringEnd
 			p.state = p.pop()
 
-		case _StringEscaped:
+		case stateStringEscaped:
 			switch b {
 			case 'b', 'f', 'n', 'r', 't', '\\', '/', '"':
-				p.state = _String
+				p.state = stateString
 			case 'u':
-				p.state = _StringUnicode
+				p.state = stateStringUnicode
 			default:
 				goto abort
 			}
 
-		case _NumberNegative:
+		case stateNumberNegative:
 			if b == '0' {
-				p.state = _NumberZero
+				p.state = stateNumberZero
 			} else if '1' <= b && b <= '9' {
-				p.state = _Number
+				p.state = stateNumber
 			} else {
 				goto abort
 			}
 
-		case _Number:
+		case stateNumber:
 			if b >= '0' && b <= '9' {
 				break
 			}
 			fallthrough
 
-		case _NumberZero:
+		case stateNumberZero:
 			if b == '.' {
-				p.state = _NumberDotFirstDigit
+				p.state = stateNumberDotFirstDigit
 			} else if b == 'e' || b == 'E' {
-				p.state = _NumberExpSign
+				p.state = stateNumberExpSign
 			} else {
 				ev = NumberEnd
 				p.state = p.pop()
@@ -354,16 +354,16 @@ func (p *Parser) Next(data []byte) (int, Event, error) {
 				i--
 			}
 
-		case _NumberDotFirstDigit:
+		case stateNumberDotFirstDigit:
 			if b >= '0' && b <= '9' {
-				p.state = _NumberDotDigit
+				p.state = stateNumberDotDigit
 			} else {
 				goto abort
 			}
 
-		case _NumberDotDigit:
+		case stateNumberDotDigit:
 			if b == 'e' || b == 'E' {
-				p.state = _NumberExpSign
+				p.state = stateNumberExpSign
 			} else if b < '0' || b > '9' {
 				ev = NumberEnd
 				p.state = p.pop()
@@ -373,21 +373,21 @@ func (p *Parser) Next(data []byte) (int, Event, error) {
 				i--
 			}
 
-		case _NumberExpSign:
-			p.state = _NumberExpFirstDigit
+		case stateNumberExpSign:
+			p.state = stateNumberExpFirstDigit
 			if b == '+' || b == '-' {
 				break
 			}
 			fallthrough
 
-		case _NumberExpFirstDigit:
+		case stateNumberExpFirstDigit:
 			if b < '0' || b > '9' {
 				goto abort
 			} else {
 				p.state++
 			}
 
-		case _NumberExpDigit:
+		case stateNumberExpDigit:
 			if b < '0' || b > '9' {
 				ev = NumberEnd
 				p.state = p.pop()
@@ -397,21 +397,21 @@ func (p *Parser) Next(data []byte) (int, Event, error) {
 				i--
 			}
 
-		case _True:
+		case stateTrue:
 			if b == 'r' {
-				p.state = _True2
+				p.state = stateTrue2
 			} else {
 				goto abort
 			}
 
-		case _True2:
+		case stateTrue2:
 			if b == 'u' {
-				p.state = _True3
+				p.state = stateTrue3
 			} else {
 				goto abort
 			}
 
-		case _True3:
+		case stateTrue3:
 			if b == 'e' {
 				ev = BoolEnd
 				p.state = p.pop()
@@ -419,28 +419,28 @@ func (p *Parser) Next(data []byte) (int, Event, error) {
 				goto abort
 			}
 
-		case _False:
+		case stateFalse:
 			if b == 'a' {
-				p.state = _False2
+				p.state = stateFalse2
 			} else {
 				goto abort
 			}
 
-		case _False2:
+		case stateFalse2:
 			if b == 'l' {
-				p.state = _False3
+				p.state = stateFalse3
 			} else {
 				goto abort
 			}
 
-		case _False3:
+		case stateFalse3:
 			if b == 's' {
-				p.state = _False4
+				p.state = stateFalse4
 			} else {
 				goto abort
 			}
 
-		case _False4:
+		case stateFalse4:
 			if b == 'e' {
 				ev = BoolEnd
 				p.state = p.pop()
@@ -448,21 +448,21 @@ func (p *Parser) Next(data []byte) (int, Event, error) {
 				goto abort
 			}
 
-		case _Null:
+		case stateNull:
 			if b == 'u' {
-				p.state = _Null2
+				p.state = stateNull2
 			} else {
 				goto abort
 			}
 
-		case _Null2:
+		case stateNull2:
 			if b == 'l' {
-				p.state = _Null3
+				p.state = stateNull3
 			} else {
 				goto abort
 			}
 
-		case _Null3:
+		case stateNull3:
 			if b == 'l' {
 				ev = NullEnd
 				p.state = p.pop()
@@ -470,7 +470,7 @@ func (p *Parser) Next(data []byte) (int, Event, error) {
 				goto abort
 			}
 
-		case _Done:
+		case stateDone:
 			// only whitespace characters are legal after the
 			// top-level value
 			goto abort
@@ -506,7 +506,7 @@ func (p *Parser) pop() int {
 
 	// if the state queue is empty, the top level value has ended
 	if length == 0 {
-		return _Done
+		return stateDone
 	}
 
 	state := p.stack[length-1]
@@ -522,11 +522,11 @@ func (p *Parser) pop() int {
 // a NumberEnd or Done event otherwise.
 func (p *Parser) End() (Event, error) {
 	switch p.state {
-	case _Done:
+	case stateDone:
 		return Done, nil
-	case _NumberZero, _Number, _NumberDotDigit, _NumberExpDigit:
+	case stateNumberZero, stateNumber, stateNumberDotDigit, stateNumberExpDigit:
 		if len(p.stack) == 0 {
-			p.state = _Done
+			p.state = stateDone
 			return NumberEnd, nil
 		}
 	}
