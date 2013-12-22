@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-var scannerTests = []struct {
+var primitiveTests = []struct {
 	input string
 	steps []step
 }{
@@ -42,22 +42,21 @@ var scannerTests = []struct {
 	},
 }
 
-func TestScanner(t *testing.T) {
-	for _, test := range scannerTests {
-		var log []string
-
-		s := new(Scanner)
-		i := 0
+func TestPrimitiveScanning(t *testing.T) {
+	for _, test := range primitiveTests {
+		var s Scanner
+		var l []string
+		var i int
 
 		for _, step := range test.steps {
-			n, desc := step(s, test.input, i)
+			n, desc := step(&s, test.input, i)
 
-			log = append(log, "  "+desc)
+			l = append(l, "  "+desc)
 			i += n
 
 			if n < 0 {
 				t.Errorf("- %#q", test.input)
-				for _, s := range log {
+				for _, s := range l {
 					t.Error(s)
 				}
 				break

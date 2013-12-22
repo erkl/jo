@@ -8,6 +8,19 @@ import (
 const (
 	sClean = iota
 	sEOF
+
+	sBoolT
+	sBoolTr
+	sBoolTru
+
+	sBoolF
+	sBoolFa
+	sBoolFal
+	sBoolFals
+
+	sNullN
+	sNullNu
+	sNullNul
 )
 
 // Scanner is a JSON scanning state machine. The zero value for Scanner is
@@ -35,6 +48,111 @@ type Scanner struct {
 //         i += n
 //     }
 func (s *Scanner) Scan(c byte) (Op, int) {
+	switch s.state {
+	case sClean:
+		switch c {
+		case ' ', '\t', '\n', '\r':
+			return OpSpace, 1
+		case '{':
+			// @todo
+		case '[':
+			// @todo
+		case '"':
+			// @todo
+		case '-':
+			// @todo
+		case '0':
+			// @todo
+		case '1', '2', '3', '4', '5', '6', '7', '8', '9':
+			// @todo
+		case 't':
+			s.state = sBoolT
+			return OpBoolStart, 1
+		case 'f':
+			s.state = sBoolF
+			return OpBoolStart, 1
+		case 'n':
+			s.state = sNullN
+			return OpNullStart, 1
+		}
+
+	case sBoolT:
+		if c == 'r' {
+			s.state = sBoolTr
+			return OpContinue, 1
+		}
+		return s.errorf(`expected 'r' after "t", found %q`, c)
+
+	case sBoolTr:
+		if c == 'u' {
+			s.state = sBoolTru
+			return OpContinue, 1
+		}
+		return s.errorf(`expected 'u' after "tr", found %q`, c)
+
+	case sBoolTru:
+		if c == 'e' {
+			s.state = s.pop()
+			return OpBoolEnd, 1
+		}
+		return s.errorf(`expected 'e' after "tru", found %q`, c)
+
+	case sBoolF:
+		if c == 'a' {
+			s.state = sBoolFa
+			return OpContinue, 1
+		}
+		return s.errorf(`expected 'a' after "f", found %q`, c)
+
+	case sBoolFa:
+		if c == 'l' {
+			s.state = sBoolFal
+			return OpContinue, 1
+		}
+		return s.errorf(`expected 'l' after "fa", found %q`, c)
+
+	case sBoolFal:
+		if c == 's' {
+			s.state = sBoolFals
+			return OpContinue, 1
+		}
+		return s.errorf(`expected 's' after "fal", found %q`, c)
+
+	case sBoolFals:
+		if c == 'e' {
+			s.state = s.pop()
+			return OpBoolEnd, 1
+		}
+		return s.errorf(`expected 'e' after "fals", found %q`, c)
+
+	case sNullN:
+		if c == 'u' {
+			s.state = sNullNu
+			return OpContinue, 1
+		}
+		return s.errorf(`expected 'u' after "n", found %q`, c)
+
+	case sNullNu:
+		if c == 'l' {
+			s.state = sNullNul
+			return OpContinue, 1
+		}
+		return s.errorf(`expected 'l' after "nu", found %q`, c)
+
+	case sNullNul:
+		if c == 'l' {
+			s.state = s.pop()
+			return OpNullEnd, 1
+		}
+		return s.errorf(`expected 'l' after "nul", found %q`, c)
+
+	case sEOF:
+		if c <= ' ' && (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+			return OpSpace, 1
+		}
+		return s.errorf(`unexpected %q after top-level value`, c)
+	}
+
 	return OpContinue, 1
 }
 
