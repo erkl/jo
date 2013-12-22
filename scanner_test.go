@@ -10,6 +10,24 @@ var scannerTests = []struct {
 	steps []step
 }{
 	{
+		`-0.123e+456`,
+		[]step{
+			ret(OpNumberStart, 1), // '-'
+			ret(OpContinue, 1),    // '0'
+			ret(OpContinue, 1),    // '.'
+			ret(OpContinue, 1),    // '1'
+			ret(OpContinue, 1),    // '2'
+			ret(OpContinue, 1),    // '3'
+			ret(OpContinue, 1),    // 'e'
+			ret(OpContinue, 1),    // '+'
+			ret(OpContinue, 1),    // '4'
+			ret(OpContinue, 1),    // '5'
+			ret(OpContinue, 1),    // '6'
+			eof(OpNumberEnd),      // EOF
+			eof(OpEOF),            // EOF (again)
+		},
+	},
+	{
 		`true`,
 		[]step{
 			ret(OpBoolStart, 1), // 't'

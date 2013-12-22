@@ -9,6 +9,15 @@ const (
 	sClean = iota
 	sEOF
 
+	sNumberNeg
+	sNumberZero
+	sNumberDigit
+	sNumberDot
+	sNumberDotDigit
+	sNumberExp
+	sNumberExpSign
+	sNumberExpDigit
+
 	sBoolT
 	sBoolTr
 	sBoolTru
@@ -60,11 +69,14 @@ func (s *Scanner) Scan(c byte) (Op, int) {
 		case '"':
 			// @todo
 		case '-':
-			// @todo
+			s.state = sNumberNeg
+			return OpNumberStart, 1
 		case '0':
-			// @todo
+			s.state = sNumberZero
+			return OpNumberStart, 1
 		case '1', '2', '3', '4', '5', '6', '7', '8', '9':
-			// @todo
+			s.state = sNumberDigit
+			return OpNumberStart, 1
 		case 't':
 			s.state = sBoolT
 			return OpBoolStart, 1
@@ -75,6 +87,78 @@ func (s *Scanner) Scan(c byte) (Op, int) {
 			s.state = sNullN
 			return OpNullStart, 1
 		}
+
+	case sNumberNeg:
+		if c == '0' {
+			s.state = sNumberZero
+			return OpContinue, 1
+		}
+		if '1' <= c && c <= '9' {
+			s.state = sNumberDigit
+			return OpContinue, 1
+		}
+		return s.errorf(`expected digit after "-", found %q`, c)
+
+	case sNumberDigit:
+		if '0' <= c && c <= '9' {
+			return OpContinue, 1
+		}
+		fallthrough
+
+	case sNumberZero:
+		if c == '.' {
+			s.state = sNumberDot
+			return OpContinue, 1
+		}
+		if c == 'e' || c == 'E' {
+			s.state = sNumberExp
+			return OpContinue, 1
+		}
+		s.state = s.pop()
+		return OpNumberEnd, 0
+
+	case sNumberDot:
+		if '0' <= c && c <= '9' {
+			s.state = sNumberDotDigit
+			return OpContinue, 1
+		}
+		return s.errorf(`expected digit after decimal point, found %q`, c)
+
+	case sNumberDotDigit:
+		if '0' <= c && c <= '9' {
+			return OpContinue, 1
+		}
+		if c == 'e' || c == 'E' {
+			s.state = sNumberExp
+			return OpContinue, 1
+		}
+		s.state = s.pop()
+		return OpNumberEnd, 0
+
+	case sNumberExp:
+		if '0' <= c && c <= '9' {
+			s.state = sNumberExpDigit
+			return OpContinue, 1
+		}
+		if c == '-' || c == '+' {
+			s.state = sNumberExpSign
+			return OpContinue, 1
+		}
+		return s.errorf(`expected sign or digit in exponent, found %q`, c)
+
+	case sNumberExpSign:
+		if '0' <= c && c <= '9' {
+			s.state = sNumberExpDigit
+			return OpContinue, 1
+		}
+		return s.errorf(`expected digit after exponent sign, found %q`)
+
+	case sNumberExpDigit:
+		if '0' <= c && c <= '9' {
+			return OpContinue, 1
+		}
+		s.state = s.pop()
+		return OpNumberEnd, 0
 
 	case sBoolT:
 		if c == 'r' {
@@ -160,7 +244,18 @@ func (s *Scanner) Scan(c byte) (Op, int) {
 // an opcode, just as s.Scan does, which will be either OpEOF, OpNumberEnd or
 // OpSyntaxError.
 func (s *Scanner) Eof() Op {
-	return OpEOF
+	switch s.state {
+	case sNumberZero, sNumberDigit, sNumberDotDigit, sNumberExpDigit:
+		if len(s.stack) == 0 {
+			s.state = sEOF
+			return OpNumberEnd
+		}
+	case sEOF:
+		return OpEOF
+	}
+
+	op, _ := s.errorf(`unexpected end of JSON input`)
+	return op
 }
 
 // LastError returns the last error raised by the Scan or Eof methods.
