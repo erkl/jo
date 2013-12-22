@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-var primitiveTests = []struct {
+var scannerTests = []struct {
 	input string
 	steps []step
 }{
@@ -42,8 +42,8 @@ var primitiveTests = []struct {
 	},
 }
 
-func TestPrimitiveScanning(t *testing.T) {
-	for _, test := range primitiveTests {
+func TestScanner(t *testing.T) {
+	for _, test := range scannerTests {
 		var s Scanner
 		var l []string
 		var i int
