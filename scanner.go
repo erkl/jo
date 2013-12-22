@@ -1,8 +1,13 @@
 package jo
 
+import (
+	"fmt"
+)
+
 // Valid scanner states.
 const (
 	sClean = iota
+	sEOF
 )
 
 // Scanner is a JSON scanning state machine. The zero value for Scanner is
@@ -51,4 +56,31 @@ func (s *Scanner) Reset() {
 	s.err = nil
 	s.stack = s.stack[:0]
 	s.size = 0
+}
+
+// push adds a new state to the stack.
+func (s *Scanner) push(x int) {
+	if len(s.stack) == s.size {
+		s.stack = append(s.stack, x)
+	} else {
+		s.stack[s.size] = x
+	}
+	s.size++
+}
+
+// pop takes the top state from the stack.
+func (s *Scanner) pop() int {
+	if s.size == 0 {
+		return sEOF
+	}
+
+	s.size--
+	return s.stack[s.size]
+}
+
+// errorf is a convenience function which both sets the scanner's error
+// field and returns an OpSyntaxError opcode.
+func (s *Scanner) errorf(format string, args ...interface{}) (Op, int) {
+	s.err = fmt.Errorf(format, args...)
+	return OpSyntaxError, 0
 }
