@@ -9,6 +9,9 @@ const (
 	sClean = iota
 	sEOF
 
+	sArrayElementOrBracket
+	sArrayCommaOrBracket
+
 	sNumberNeg
 	sNumberZero
 	sNumberDigit
@@ -57,6 +60,7 @@ type Scanner struct {
 //         i += n
 //     }
 func (s *Scanner) Scan(c byte) (Op, int) {
+rewind:
 	switch s.state {
 	case sClean:
 		switch c {
@@ -65,7 +69,8 @@ func (s *Scanner) Scan(c byte) (Op, int) {
 		case '{':
 			// @todo
 		case '[':
-			// @todo
+			s.state = sArrayElementOrBracket
+			return OpArrayStart, 1
 		case '"':
 			// @todo
 		case '-':
@@ -87,6 +92,28 @@ func (s *Scanner) Scan(c byte) (Op, int) {
 			s.state = sNullN
 			return OpNullStart, 1
 		}
+
+	case sArrayElementOrBracket:
+		if c == ']' {
+			s.state = s.pop()
+			return OpArrayEnd, 1
+		}
+		s.push(sArrayCommaOrBracket)
+		s.state = sClean
+		goto rewind
+
+	case sArrayCommaOrBracket:
+		switch c {
+		case ' ', '\t', '\n', '\r':
+			return OpContinue, 1
+		case ',':
+			s.state = sArrayElementOrBracket
+			return OpContinue, 1
+		case ']':
+			s.state = s.pop()
+			return OpArrayEnd, 1
+		}
+		return s.errorf(`expected ',' or ']' after array element, found %q`, c)
 
 	case sNumberNeg:
 		if c == '0' {
