@@ -268,8 +268,7 @@ rewind:
 			s.state = sNumberExp
 			return OpContinue, 1
 		}
-		s.state = s.pop()
-		return OpNumberEnd, 0
+		goto numend
 
 	case sNumberDot:
 		if '0' <= c && c <= '9' {
@@ -286,8 +285,7 @@ rewind:
 			s.state = sNumberExp
 			return OpContinue, 1
 		}
-		s.state = s.pop()
-		return OpNumberEnd, 0
+		goto numend
 
 	case sNumberExp:
 		if '0' <= c && c <= '9' {
@@ -311,8 +309,7 @@ rewind:
 		if '0' <= c && c <= '9' {
 			return OpContinue, 1
 		}
-		s.state = s.pop()
-		return OpNumberEnd, 0
+		goto numend
 
 	case sBoolT:
 		if c == 'r' {
@@ -392,6 +389,17 @@ rewind:
 	}
 
 	panic("invalid internal state")
+
+numend:
+	dup := *s
+	dup.state = dup.pop()
+
+	if op, _ := dup.Scan(c); op == OpSyntaxError {
+		return OpSyntaxError, 0
+	}
+
+	s.state = s.pop()
+	return OpNumberEnd, 0
 }
 
 // Eof signals the scanner that the end of input has been reached. It returns
