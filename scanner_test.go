@@ -189,6 +189,32 @@ var scannerTests = []struct {
 			eof(OpEOF),            // EOF
 		},
 	},
+	{
+		`"foo`,
+		[]step{
+			ret(OpStringStart, 1), // '"'
+			ret(OpContinue, 1),    // 'f'
+			ret(OpContinue, 1),    // 'o'
+			ret(OpContinue, 1),    // 'o'
+			eof(OpSyntaxError),    // 'EOF'
+		},
+	},
+	{
+		`1 2`,
+		[]step{
+			ret(OpNumberStart, 1), // '1'
+			ret(OpNumberEnd, 0),   // ' '
+			ret(OpSpace, 1),       // ' ' (again)
+			ret(OpSyntaxError, 0), // '2'
+		},
+	},
+	{
+		`0123`,
+		[]step{
+			ret(OpNumberStart, 1), // '0'
+			ret(OpSyntaxError, 0), // '1'
+		},
+	},
 }
 
 func TestScanner(t *testing.T) {
