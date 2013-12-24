@@ -10,20 +10,56 @@ var scannerTests = []struct {
 	steps []step
 }{
 	{
-		`{"one":"foo", "two":"bar"}`,
+		`[ ]`,
+		[]step{
+			ret(OpArrayStart, 1), // '['
+			ret(OpSpace, 1),      // ' '
+			ret(OpArrayEnd, 1),   // ']'
+			eof(OpEOF),           // EOF
+		},
+	},
+	{
+		`[ 0e1 , -2.34 ]`,
+		[]step{
+			ret(OpArrayStart, 1),  // '['
+			ret(OpSpace, 1),       // ' '
+			ret(OpNumberStart, 1), // 0
+			ret(OpContinue, 1),    // e
+			ret(OpContinue, 1),    // 1
+			ret(OpNumberEnd, 0),   // ' '
+			ret(OpSpace, 1),       // ' ' (again)
+			ret(OpContinue, 1),    // ','
+			ret(OpSpace, 1),       // ' '
+			ret(OpNumberStart, 1), // '-'
+			ret(OpContinue, 1),    // '2'
+			ret(OpContinue, 1),    // '.'
+			ret(OpContinue, 1),    // '3'
+			ret(OpContinue, 1),    // '4'
+			ret(OpNumberEnd, 0),   // ' '
+			ret(OpSpace, 1),       // ' ' (again)
+			ret(OpArrayEnd, 1),    // ']'
+			eof(OpEOF),            // EOF
+		},
+	},
+	{
+		`{ "one" : "foo" , "two" : "bar" }`,
 		[]step{
 			ret(OpObjectStart, 1),    // '{'
+			ret(OpSpace, 1),          // ' '
 			ret(OpObjectKeyStart, 1), // '"'
 			ret(OpContinue, 1),       // 'o'
 			ret(OpContinue, 1),       // 'n'
 			ret(OpContinue, 1),       // 'e'
 			ret(OpObjectKeyEnd, 1),   // '"'
+			ret(OpSpace, 1),          // ' '
 			ret(OpContinue, 1),       // ':'
+			ret(OpSpace, 1),          // ' '
 			ret(OpStringStart, 1),    // '"'
 			ret(OpContinue, 1),       // 'f'
 			ret(OpContinue, 1),       // 'o'
 			ret(OpContinue, 1),       // 'o'
 			ret(OpStringEnd, 1),      // '"'
+			ret(OpSpace, 1),          // ' '
 			ret(OpContinue, 1),       // ','
 			ret(OpSpace, 1),          // ' '
 			ret(OpObjectKeyStart, 1), // '"'
@@ -31,14 +67,26 @@ var scannerTests = []struct {
 			ret(OpContinue, 1),       // 'w'
 			ret(OpContinue, 1),       // 'o'
 			ret(OpObjectKeyEnd, 1),   // '"'
+			ret(OpSpace, 1),          // ' '
 			ret(OpContinue, 1),       // ':'
+			ret(OpSpace, 1),          // ' '
 			ret(OpStringStart, 1),    // '"'
 			ret(OpContinue, 1),       // 'b'
 			ret(OpContinue, 1),       // 'a'
 			ret(OpContinue, 1),       // 'r'
 			ret(OpStringEnd, 1),      // '"'
+			ret(OpSpace, 1),          // ' '
 			ret(OpObjectEnd, 1),      // '}'
 			eof(OpEOF),               // EOF
+		},
+	},
+	{
+		`{ }`,
+		[]step{
+			ret(OpObjectStart, 1), // '{'
+			ret(OpSpace, 1),       // ' '
+			ret(OpObjectEnd, 1),   // '}'
+			eof(OpEOF),            // EOF
 		},
 	},
 	{
@@ -128,6 +176,17 @@ var scannerTests = []struct {
 			ret(OpContinue, 1),  // 'l'
 			ret(OpNullEnd, 1),   // 'l'
 			eof(OpEOF),          // EOF
+		},
+	},
+	{
+		` " " `,
+		[]step{
+			ret(OpSpace, 1),       // ' '
+			ret(OpStringStart, 1), // '"'
+			ret(OpContinue, 1),    // ' '
+			ret(OpStringEnd, 1),   // '"'
+			ret(OpSpace, 1),       // ' '
+			eof(OpEOF),            // EOF
 		},
 	},
 }
