@@ -445,12 +445,11 @@ func (s *Scanner) push(x int) {
 
 // pop takes the top state from the stack.
 func (s *Scanner) pop() int {
-	if s.size == 0 {
-		return sEOF
+	if s.size > 0 {
+		s.size--
+		return s.stack[s.size]
 	}
-
-	s.size--
-	return s.stack[s.size]
+	return sEOF
 }
 
 // errorf is a convenience function which both sets the scanner's error

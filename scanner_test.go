@@ -42,6 +42,15 @@ var scannerTests = []struct {
 		},
 	},
 	{
+		`{ }`,
+		[]step{
+			ret(OpObjectStart, 1), // '{'
+			ret(OpSpace, 1),       // ' '
+			ret(OpObjectEnd, 1),   // '}'
+			eof(OpEOF),            // EOF
+		},
+	},
+	{
 		`{ "one" : "foo" , "two" : "bar" }`,
 		[]step{
 			ret(OpObjectStart, 1),    // '{'
@@ -78,15 +87,6 @@ var scannerTests = []struct {
 			ret(OpSpace, 1),          // ' '
 			ret(OpObjectEnd, 1),      // '}'
 			eof(OpEOF),               // EOF
-		},
-	},
-	{
-		`{ }`,
-		[]step{
-			ret(OpObjectStart, 1), // '{'
-			ret(OpSpace, 1),       // ' '
-			ret(OpObjectEnd, 1),   // '}'
-			eof(OpEOF),            // EOF
 		},
 	},
 	{
