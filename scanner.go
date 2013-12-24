@@ -161,7 +161,10 @@ rewind:
 		return s.errorf(`expected object key after ',', found %q`, c)
 
 	case sArrayElementOrBracket:
-		if c == ']' {
+		switch c {
+		case ' ', '\t', '\r', '\n':
+			return OpSpace, 1
+		case ']':
 			s.state = s.pop()
 			return OpArrayEnd, 1
 		}
@@ -172,7 +175,7 @@ rewind:
 	case sArrayCommaOrBracket:
 		switch c {
 		case ' ', '\t', '\n', '\r':
-			return OpContinue, 1
+			return OpSpace, 1
 		case ',':
 			s.state = sArrayElementOrBracket
 			return OpContinue, 1
