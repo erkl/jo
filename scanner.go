@@ -108,6 +108,7 @@ rewind:
 			s.state = sNullN
 			return OpNullStart, 1
 		}
+		return s.errorf(`expected start of JSON value, found %q`, c)
 
 	case sObjectKeyOrBrace:
 		switch c {
