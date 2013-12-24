@@ -9,6 +9,11 @@ const (
 	sClean = iota
 	sEOF
 
+	sObjectKeyOrBrace
+	sObjectColon
+	sObjectCommaOrBrace
+	sObjectKey
+
 	sArrayElementOrBracket
 	sArrayCommaOrBracket
 
@@ -49,6 +54,7 @@ type Scanner struct {
 	err   error
 	stack []int
 	size  int
+	isKey bool
 }
 
 // Scan feeds another byte to the scanner.
@@ -74,12 +80,14 @@ rewind:
 		case ' ', '\t', '\n', '\r':
 			return OpSpace, 1
 		case '{':
-			// @todo
+			s.state = sObjectKeyOrBrace
+			return OpObjectStart, 1
 		case '[':
 			s.state = sArrayElementOrBracket
 			return OpArrayStart, 1
 		case '"':
 			s.state = sString
+			s.isKey = false
 			return OpStringStart, 1
 		case '-':
 			s.state = sNumberNeg
@@ -100,6 +108,57 @@ rewind:
 			s.state = sNullN
 			return OpNullStart, 1
 		}
+
+	case sObjectKeyOrBrace:
+		switch c {
+		case ' ', '\t', '\r', '\n':
+			return OpSpace, 1
+		case '"':
+			s.state = sString
+			s.isKey = true
+			s.push(sObjectColon)
+			return OpObjectKeyStart, 1
+		case '}':
+			s.state = s.pop()
+			return OpObjectEnd, 1
+		}
+		return s.errorf(`expected object key or '}', found %q`, c)
+
+	case sObjectColon:
+		switch c {
+		case ' ', '\t', 'r', '\n':
+			return OpSpace, 1
+		case ':':
+			s.state = sClean
+			s.push(sObjectCommaOrBrace)
+			return OpContinue, 1
+		}
+		return s.errorf(`expected ':' after object key, found %q`, c)
+
+	case sObjectCommaOrBrace:
+		switch c {
+		case ' ', '\t', '\r', '\n':
+			return OpSpace, 1
+		case ',':
+			s.state = sObjectKey
+			return OpContinue, 1
+		case '}':
+			s.state = s.pop()
+			return OpObjectEnd, 1
+		}
+		return s.errorf(`expected object key or '}' after object value, found %q`, c)
+
+	case sObjectKey:
+		switch c {
+		case ' ', '\t', '\r', '\n':
+			return OpSpace, 1
+		case '"':
+			s.state = sString
+			s.isKey = true
+			s.push(sObjectColon)
+			return OpObjectKeyStart, 1
+		}
+		return s.errorf(`expected object key after ',', found %q`, c)
 
 	case sArrayElementOrBracket:
 		if c == ']' {
@@ -126,6 +185,9 @@ rewind:
 	case sString:
 		if c == '"' {
 			s.state = s.pop()
+			if s.isKey {
+				return OpObjectKeyEnd, 1
+			}
 			return OpStringEnd, 1
 		}
 		if c == '\\' {
