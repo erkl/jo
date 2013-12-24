@@ -391,7 +391,7 @@ rewind:
 		return s.errorf(`unexpected %q after top-level value`, c)
 	}
 
-	return OpContinue, 1
+	panic("invalid internal state")
 }
 
 // Eof signals the scanner that the end of input has been reached. It returns
