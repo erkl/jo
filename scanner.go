@@ -77,7 +77,7 @@ rewind:
 	switch s.state {
 	case sClean:
 		switch c {
-		case ' ', '\t', '\n', '\r':
+		case ' ', '\t', '\r', '\n':
 			return OpSpace, 1
 		case '{':
 			s.state = sObjectKeyOrBrace
@@ -115,9 +115,9 @@ rewind:
 		case ' ', '\t', '\r', '\n':
 			return OpSpace, 1
 		case '"':
+			s.push(sObjectColon)
 			s.state = sString
 			s.isKey = true
-			s.push(sObjectColon)
 			return OpObjectKeyStart, 1
 		case '}':
 			s.state = s.pop()
@@ -130,8 +130,8 @@ rewind:
 		case ' ', '\t', 'r', '\n':
 			return OpSpace, 1
 		case ':':
-			s.state = sClean
 			s.push(sObjectCommaOrBrace)
+			s.state = sClean
 			return OpContinue, 1
 		}
 		return s.errorf(`expected ':' after object key, found %q`, c)
@@ -154,9 +154,9 @@ rewind:
 		case ' ', '\t', '\r', '\n':
 			return OpSpace, 1
 		case '"':
+			s.push(sObjectColon)
 			s.state = sString
 			s.isKey = true
-			s.push(sObjectColon)
 			return OpObjectKeyStart, 1
 		}
 		return s.errorf(`expected object key after ',', found %q`, c)
