@@ -12,6 +12,13 @@ const (
 	sArrayElementOrBracket
 	sArrayCommaOrBracket
 
+	sString
+	sStringEsc
+	sStringUnicode
+	sStringUnicode1
+	sStringUnicode12
+	sStringUnicode123
+
 	sNumberNeg
 	sNumberZero
 	sNumberDigit
@@ -72,7 +79,8 @@ rewind:
 			s.state = sArrayElementOrBracket
 			return OpArrayStart, 1
 		case '"':
-			// @todo
+			s.state = sString
+			return OpStringStart, 1
 		case '-':
 			s.state = sNumberNeg
 			return OpNumberStart, 1
@@ -114,6 +122,59 @@ rewind:
 			return OpArrayEnd, 1
 		}
 		return s.errorf(`expected ',' or ']' after array element, found %q`, c)
+
+	case sString:
+		if c == '"' {
+			s.state = s.pop()
+			return OpStringEnd, 1
+		}
+		if c == '\\' {
+			s.state = sStringEsc
+			return OpContinue, 1
+		}
+		if c >= 0x20 {
+			return OpContinue, 1
+		}
+		return s.errorf(`unexpected control character in string literal`)
+
+	case sStringEsc:
+		switch c {
+		case 'b', 'f', 'n', 'r', 't', '\\', '/', '"':
+			s.state = sString
+			return OpContinue, 1
+		case 'u':
+			s.state = sStringUnicode
+			return OpContinue, 1
+		}
+		return s.errorf(`illegal escape sequence in string literal`)
+
+	case sStringUnicode:
+		if '0' <= c && c <= '9' || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F' {
+			s.state = sStringUnicode1
+			return OpContinue, 1
+		}
+		return s.errorf(`illegal unicode escape sequence in string literal`)
+
+	case sStringUnicode1:
+		if '0' <= c && c <= '9' || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F' {
+			s.state = sStringUnicode12
+			return OpContinue, 1
+		}
+		return s.errorf(`illegal unicode escape sequence in string literal`)
+
+	case sStringUnicode12:
+		if '0' <= c && c <= '9' || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F' {
+			s.state = sStringUnicode123
+			return OpContinue, 1
+		}
+		return s.errorf(`illegal unicode escape sequence in string literal`)
+
+	case sStringUnicode123:
+		if '0' <= c && c <= '9' || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F' {
+			s.state = sString
+			return OpContinue, 1
+		}
+		return s.errorf(`illegal unicode escape sequence in string literal`)
 
 	case sNumberNeg:
 		if c == '0' {

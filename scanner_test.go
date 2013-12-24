@@ -28,6 +28,28 @@ var scannerTests = []struct {
 		},
 	},
 	{
+		`"foo-\u2603\r\n"`,
+		[]step{
+			ret(OpStringStart, 1), // '"'
+			ret(OpContinue, 1),    // 'f'
+			ret(OpContinue, 1),    // 'o'
+			ret(OpContinue, 1),    // 'o'
+			ret(OpContinue, 1),    // '-'
+			ret(OpContinue, 1),    // '\\'
+			ret(OpContinue, 1),    // 'u'
+			ret(OpContinue, 1),    // '2'
+			ret(OpContinue, 1),    // '6'
+			ret(OpContinue, 1),    // '0'
+			ret(OpContinue, 1),    // '3'
+			ret(OpContinue, 1),    // '\\'
+			ret(OpContinue, 1),    // 'r'
+			ret(OpContinue, 1),    // '\\'
+			ret(OpContinue, 1),    // 'n'
+			ret(OpStringEnd, 1),   // '"'
+			eof(OpEOF),            // EOF
+		},
+	},
+	{
 		`-0.123e+456`,
 		[]step{
 			ret(OpNumberStart, 1), // '-'
