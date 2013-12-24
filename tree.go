@@ -57,36 +57,6 @@ type Node struct {
 	Next  *Node
 }
 
-// Bool uses ParseBool to interpret the node's contents.
-func (n *Node) Bool() (bool, error) {
-	v, err := ParseBool(n.Bytes)
-	return v, err
-}
-
-// Int uses ParseInt to interpret the node's contents.
-func (n *Node) Int() (int64, error) {
-	v, err := ParseInt(n.Bytes)
-	return v, err
-}
-
-// Uint uses ParseUint to interpret the node's contents.
-func (n *Node) Uint() (uint64, error) {
-	v, err := ParseUint(n.Bytes)
-	return v, err
-}
-
-// Float uses ParseFloat to interpret the node's contents.
-func (n *Node) Float() (float64, error) {
-	v, err := ParseFloat(n.Bytes)
-	return v, err
-}
-
-// String uses Unquote to interpret the node's contents.
-func (n *Node) String() (string, error) {
-	v, err := Unquote(n.Bytes)
-	return v, err
-}
-
 // MarshalJSON marshals the node's value back to JSON.
 func (n *Node) MarshalJSON() ([]byte, error) {
 	if n.Type != Object && n.Type != Array {
