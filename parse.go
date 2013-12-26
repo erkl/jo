@@ -81,3 +81,126 @@ const (
 	BoolNode
 	NullNode
 )
+
+// Parse parses raw JSON input and generates its tree representation.
+func Parse(buf []byte) (*Node, error) {
+	var p = parseState{buf: buf}
+
+	root, err := p.close(p.scan())
+	if err != nil {
+		return nil, err
+	}
+
+	// consume all bytes after the top-level value
+	if p.scan() == OpSyntaxError {
+		return nil, p.s.LastError()
+	}
+
+	return root, nil
+}
+
+// parseState holds state when parsing a JSON value.
+type parseState struct {
+	s   Scanner
+	buf []byte
+	off int
+}
+
+// close completely parses the Node opened by op.
+func (p *parseState) close(op Op) (*Node, error) {
+	switch op {
+	case OpSyntaxError:
+		return nil, p.s.LastError()
+	case OpObjectStart:
+		return p.closeObject()
+	case OpArrayStart:
+		return p.closeArray()
+	default:
+		return p.closeLiteral()
+	}
+}
+
+func (p *parseState) closeObject() (*Node, error) {
+	obj := &Node{Type: ObjectNode}
+
+	for {
+		switch op := p.scan(); op {
+		case OpSyntaxError:
+			return nil, p.s.LastError()
+
+		case OpObjectEnd:
+			return obj, nil
+
+		case OpObjectKeyStart:
+			key, err := p.closeLiteral()
+			if err != nil {
+				return nil, err
+			}
+			obj.AppendChild(key)
+
+		default:
+			val, err := p.close(op)
+			if err != nil {
+				return nil, err
+			}
+			obj.LastChild.AppendChild(val)
+		}
+	}
+}
+
+func (p *parseState) closeArray() (*Node, error) {
+	arr := &Node{Type: ArrayNode}
+
+	for {
+		switch op := p.scan(); op {
+		case OpSyntaxError:
+			return nil, p.s.LastError()
+
+		case OpArrayEnd:
+			return arr, nil
+
+		default:
+			elem, err := p.close(op)
+			if err != nil {
+				return nil, err
+			}
+			arr.AppendChild(elem)
+		}
+	}
+}
+
+func (p *parseState) closeLiteral() (*Node, error) {
+	var typ NodeType
+	var start = p.off - 1
+
+	switch p.scan() {
+	case OpSyntaxError:
+		return nil, p.s.LastError()
+	case OpObjectKeyEnd:
+		typ = ObjectKeyNode
+	case OpStringEnd:
+		typ = StringNode
+	case OpNumberEnd:
+		typ = NumberNode
+	case OpBoolEnd:
+		typ = BoolNode
+	case OpNullEnd:
+		typ = NullNode
+	}
+
+	return &Node{Type: typ, Raw: p.buf[start:p.off]}, nil
+}
+
+// scan returns the next significant scanning opcode.
+func (p *parseState) scan() Op {
+	for p.off < len(p.buf) {
+		op, n := p.s.Scan(p.buf[p.off])
+		p.off += n
+
+		if op != OpContinue && op != OpSpace {
+			return op
+		}
+	}
+
+	return p.s.Eof()
+}
