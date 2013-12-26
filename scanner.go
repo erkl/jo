@@ -466,7 +466,7 @@ rewind:
 		return s.errorf(`unexpected %q after top-level value`, c)
 	}
 
-	panic("invalid internal state")
+	panic("jo: invalid scanner state")
 
 numend:
 	dup := *s

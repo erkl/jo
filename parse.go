@@ -30,7 +30,7 @@ type Node struct {
 // AppendChild adds a child to the subject Node.
 func (n *Node) AppendChild(c *Node) {
 	if c.Parent != nil || c.PrevSibling != nil || c.NextSibling != nil {
-		panic("AppendChild called with an already attached Node")
+		panic("jo: AppendChild called with an already attached Node")
 	}
 
 	if n.FirstChild == nil {
@@ -47,7 +47,7 @@ func (n *Node) AppendChild(c *Node) {
 // RemoveChild removes a child from the subject Node.
 func (n *Node) RemoveChild(c *Node) {
 	if c.Parent != n {
-		panic("RemoveChild called for non-child Node")
+		panic("jo: RemoveChild called for non-child Node")
 	}
 
 	if n.FirstChild == c {
