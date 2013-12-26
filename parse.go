@@ -186,6 +186,8 @@ func (p *parseState) closeLiteral() (*Node, error) {
 		typ = BoolNode
 	case OpNullEnd:
 		typ = NullNode
+	default:
+		panic("jo: unexpected opcode")
 	}
 
 	return &Node{Type: typ, Raw: p.buf[start:p.off]}, nil
