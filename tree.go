@@ -1,23 +1,22 @@
 package jo
 
+// NodeType indicates the type of the value stored in a Node.
+type NodeType int
+
+const (
+	ObjectNode NodeType = iota
+	ObjectKeyNode
+	ArrayNode
+	StringNode
+	NumberNode
+	BoolNode
+	NullNode
+)
+
 // A Node is a part of a tree describing a JSON value. It contains
 // information about the node's type, its original JSON representation
 // (for literal values), and information about its position inside
 // the tree.
-//
-// The tree representation of the following JSON value
-//
-//     { "foo": [123, 456], "bar": false }
-//
-// looks like this:
-//
-//     ObjectNode
-//     ├─ ObjectKeyNode ("foo")
-//     │  └─ ArrayNode
-//     │     ├─ NumberNode (123)
-//     │     └─ NumberNode (456)
-//     └─ ObjectKeyNode ("bar")
-//        └─ BoolNode (false)
 type Node struct {
 	Type NodeType
 	Raw  []byte
@@ -68,19 +67,6 @@ func (n *Node) RemoveChild(c *Node) {
 	c.PrevSibling = nil
 	c.NextSibling = nil
 }
-
-// NodeType indicates the type of the value stored in a Node.
-type NodeType int
-
-const (
-	ObjectNode NodeType = iota
-	ObjectKeyNode
-	ArrayNode
-	StringNode
-	NumberNode
-	BoolNode
-	NullNode
-)
 
 // Parse parses raw JSON input and generates its tree representation.
 func Parse(buf []byte) (*Node, error) {
