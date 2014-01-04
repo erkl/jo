@@ -43,6 +43,39 @@ func (n *Node) AppendChild(c *Node) {
 	n.LastChild = c
 }
 
+// InsertChild adds a child to the subject Node, immediately before a
+// reference node. Calling InsertChild with a nil reference node is
+// functionally equivalent to just calling AppendChild.
+func (n *Node) InsertChild(c, before *Node) {
+	switch {
+	case c.Parent != nil || c.PrevSibling != nil || c.NextSibling != nil:
+		panic("jo: InsertChild called with an already attached Node")
+	case before != nil && before.Parent != n:
+		panic("jo: InsertChild called with unknown reference node")
+	}
+
+	c.Parent = n
+	c.NextSibling = before
+
+	if before == nil {
+		if n.LastChild != nil {
+			n.LastChild.NextSibling = c
+		}
+		c.PrevSibling = n.LastChild
+		n.LastChild = c
+	} else {
+		if before.PrevSibling != nil {
+			before.PrevSibling.NextSibling = c
+		}
+		c.PrevSibling = before.PrevSibling
+		before.PrevSibling = c
+	}
+
+	if n.FirstChild == before {
+		n.FirstChild = c
+	}
+}
+
 // RemoveChild removes a child from the subject Node.
 func (n *Node) RemoveChild(c *Node) {
 	if c.Parent != n {
