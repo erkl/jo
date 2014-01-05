@@ -101,6 +101,87 @@ func (n *Node) RemoveChild(c *Node) {
 	c.NextSibling = nil
 }
 
+// MarshalJSON marshals to JSON the tree structure rooted at the node.
+// Note that there are no sanity checks, so malformed node trees will
+// generate invalid JSON output.
+func (n *Node) MarshalJSON() ([]byte, error) {
+	out := make([]byte, n.marshalledSize())
+	n.marshalTo(out)
+
+	return out, nil
+}
+
+// marshalledSize returns the number of bytes required to marshal
+// the node to JSON.
+func (n *Node) marshalledSize() int {
+	switch n.Type {
+	case ArrayNode, ObjectNode:
+		if n.FirstChild == nil {
+			return 2
+		}
+
+		var total, count int
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			total += c.marshalledSize()
+			count++
+		}
+		return 2 + total + (count - 1)
+
+	case ObjectKeyNode:
+		if c := n.FirstChild; c != nil {
+			return len(n.Raw) + 1 + c.marshalledSize()
+		}
+		return len(n.Raw) + 1
+	}
+
+	return len(n.Raw)
+}
+
+// marshalTo writes the node's JSON representation to a byte slice,
+// and returns the number of bytes written.
+func (n *Node) marshalTo(dst []byte) (w int) {
+	switch n.Type {
+	case ObjectNode:
+		dst[w] = '{'
+		w++
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			if c != n.FirstChild {
+				dst[w] = ','
+				w++
+			}
+			w += c.marshalTo(dst[w:])
+		}
+		dst[w] = '}'
+		w++
+
+	case ArrayNode:
+		dst[w] = '['
+		w++
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			if c != n.FirstChild {
+				dst[w] = ','
+				w++
+			}
+			w += c.marshalTo(dst[w:])
+		}
+		dst[w] = ']'
+		w++
+
+	case ObjectKeyNode:
+		w += copy(dst, n.Raw)
+		dst[w] = ':'
+		w++
+		if n.FirstChild != nil {
+			w += n.FirstChild.marshalTo(dst[w:])
+		}
+
+	default:
+		w = copy(dst[w:], n.Raw)
+	}
+
+	return w
+}
+
 // Parse parses raw JSON input and generates its tree representation.
 func Parse(buf []byte) (*Node, error) {
 	var p = parseState{buf: buf}
