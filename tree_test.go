@@ -1,9 +1,28 @@
 package jo
 
 import (
+	"bytes"
 	"runtime"
 	"testing"
 )
+
+func TestNodeMarshalJSON(t *testing.T) {
+	input := []byte(`{"foo":["hello",null,{"bar":1e10}],"bar":false}`)
+
+	root, err := Parse(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	output, err := root.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !bytes.Equal(input, output) {
+		t.Fatalf("%q != %q", output, input)
+	}
+}
 
 func TestNodeAppendChild(t *testing.T) {
 	r := &Node{Type: ArrayNode}
