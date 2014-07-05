@@ -28,6 +28,10 @@ const (
 	BoolEnd
 	NullEnd
 
+	// Start and end bitsets.
+	Start = ObjectStart | KeyStart | ArrayStart | StringStart | NumberStart | BoolStart | NullStart
+	End   = ObjectEnd | KeyEnd | ArrayEnd | StringEnd | NumberEnd | BoolEnd | NullEnd
+
 	// Syntax error.
 	Error = (1 << iota)
 )
