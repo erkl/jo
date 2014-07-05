@@ -4,8 +4,11 @@ package jo
 type Event int
 
 const (
+	// Syntax error.
+	Error Event = -1
+
 	// Nothing of interest, continue scanning.
-	None Event = 0
+	None = 0
 
 	// Same as None, but specifically for whitespace.
 	Space = (1 << iota)
@@ -31,7 +34,4 @@ const (
 	// Start and end bitsets.
 	Start = ObjectStart | KeyStart | ArrayStart | StringStart | NumberStart | BoolStart | NullStart
 	End   = ObjectEnd | KeyEnd | ArrayEnd | StringEnd | NumberEnd | BoolEnd | NullEnd
-
-	// Syntax error.
-	Error = (1 << iota)
 )
