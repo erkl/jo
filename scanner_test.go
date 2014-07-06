@@ -1,270 +1,201 @@
 package jo
 
 import (
-	"fmt"
 	"testing"
 )
 
 var scannerTests = []struct {
-	input string
-	steps []step
+	in  string
+	out []Event
 }{
 	{
-		`[ ]`,
-		[]step{
-			ret(OpArrayStart, 1), // '['
-			ret(OpSpace, 1),      // ' '
-			ret(OpArrayEnd, 1),   // ']'
-			eof(OpEOF),           // EOF
+		`"foo"`,
+		[]Event{
+			StringStart, // '"'
+			None,        // 'f'
+			None,        // 'o'
+			None,        // 'o'
+			None,        // '"'
+			StringEnd,   // EOF
 		},
 	},
 	{
-		`[ 0e1 , -2.34 ]`,
-		[]step{
-			ret(OpArrayStart, 1),  // '['
-			ret(OpSpace, 1),       // ' '
-			ret(OpNumberStart, 1), // 0
-			ret(OpContinue, 1),    // e
-			ret(OpContinue, 1),    // 1
-			ret(OpNumberEnd, 0),   // ' '
-			ret(OpSpace, 1),       // ' ' (again)
-			ret(OpContinue, 1),    // ','
-			ret(OpSpace, 1),       // ' '
-			ret(OpNumberStart, 1), // '-'
-			ret(OpContinue, 1),    // '2'
-			ret(OpContinue, 1),    // '.'
-			ret(OpContinue, 1),    // '3'
-			ret(OpContinue, 1),    // '4'
-			ret(OpNumberEnd, 0),   // ' '
-			ret(OpSpace, 1),       // ' ' (again)
-			ret(OpArrayEnd, 1),    // ']'
-			eof(OpEOF),            // EOF
+		" \" \tbar\r\n\"\n ",
+		[]Event{
+			Space,             // ' '
+			StringStart,       // '"'
+			None,              // ' '
+			None,              // '\t'
+			None,              // 'b'
+			None,              // 'a'
+			None,              // 'r'
+			None,              // '\r'
+			None,              // '\n'
+			None,              // '"'
+			StringEnd | Space, // '\n'
+			Space,             // ' '
+			None,              // EOF
 		},
 	},
 	{
-		`{ }`,
-		[]step{
-			ret(OpObjectStart, 1), // '{'
-			ret(OpSpace, 1),       // ' '
-			ret(OpObjectEnd, 1),   // '}'
-			eof(OpEOF),            // EOF
+		`"\b\f\n\r\t\\\/\""`,
+		[]Event{
+			StringStart, // '"'
+			None,        // '\\'
+			None,        // 'b'
+			None,        // '\\'
+			None,        // 'f'
+			None,        // '\\'
+			None,        // 'n'
+			None,        // '\\'
+			None,        // 'r'
+			None,        // '\\'
+			None,        // 't'
+			None,        // '\\'
+			None,        // '\\'
+			None,        // '\\'
+			None,        // '/'
+			None,        // '\\'
+			None,        // '"'
+			None,        // '"'
+			StringEnd,   // EOF
 		},
 	},
 	{
-		`{ "one" : "foo" , "two" : "bar" }`,
-		[]step{
-			ret(OpObjectStart, 1),    // '{'
-			ret(OpSpace, 1),          // ' '
-			ret(OpObjectKeyStart, 1), // '"'
-			ret(OpContinue, 1),       // 'o'
-			ret(OpContinue, 1),       // 'n'
-			ret(OpContinue, 1),       // 'e'
-			ret(OpObjectKeyEnd, 1),   // '"'
-			ret(OpSpace, 1),          // ' '
-			ret(OpContinue, 1),       // ':'
-			ret(OpSpace, 1),          // ' '
-			ret(OpStringStart, 1),    // '"'
-			ret(OpContinue, 1),       // 'f'
-			ret(OpContinue, 1),       // 'o'
-			ret(OpContinue, 1),       // 'o'
-			ret(OpStringEnd, 1),      // '"'
-			ret(OpSpace, 1),          // ' '
-			ret(OpContinue, 1),       // ','
-			ret(OpSpace, 1),          // ' '
-			ret(OpObjectKeyStart, 1), // '"'
-			ret(OpContinue, 1),       // 't'
-			ret(OpContinue, 1),       // 'w'
-			ret(OpContinue, 1),       // 'o'
-			ret(OpObjectKeyEnd, 1),   // '"'
-			ret(OpSpace, 1),          // ' '
-			ret(OpContinue, 1),       // ':'
-			ret(OpSpace, 1),          // ' '
-			ret(OpStringStart, 1),    // '"'
-			ret(OpContinue, 1),       // 'b'
-			ret(OpContinue, 1),       // 'a'
-			ret(OpContinue, 1),       // 'r'
-			ret(OpStringEnd, 1),      // '"'
-			ret(OpSpace, 1),          // ' '
-			ret(OpObjectEnd, 1),      // '}'
-			eof(OpEOF),               // EOF
+		`"\u2603 = ☃"`,
+		[]Event{
+			StringStart, // '"'
+			None,        // '\\'
+			None,        // 'u'
+			None,        // '2'
+			None,        // '6'
+			None,        // '0'
+			None,        // '3'
+			None,        // ' '
+			None,        // '='
+			None,        // ' '
+			None,        // '\xE2'
+			None,        // '\x98'
+			None,        // '\x83'
+			None,        // '"'
+			StringEnd,   // EOF
 		},
 	},
 	{
-		`[123, null]`,
-		[]step{
-			ret(OpArrayStart, 1),  // '['
-			ret(OpNumberStart, 1), // '1'
-			ret(OpContinue, 1),    // '2'
-			ret(OpContinue, 1),    // '3'
-			ret(OpNumberEnd, 0),   // ','
-			ret(OpContinue, 1),    // ',' (again)
-			ret(OpSpace, 1),       // ' '
-			ret(OpNullStart, 1),   // 'n'
-			ret(OpContinue, 1),    // 'u'
-			ret(OpContinue, 1),    // 'l'
-			ret(OpNullEnd, 1),     // 'l'
-			ret(OpArrayEnd, 1),    // ']'
-			eof(OpEOF),            // EOF
+		`0 `,
+		[]Event{
+			NumberStart,       // '0'
+			NumberEnd | Space, // ' '
+			None,              // EOF
 		},
 	},
 	{
-		`"foo-\u2603\r\n"`,
-		[]step{
-			ret(OpStringStart, 1), // '"'
-			ret(OpContinue, 1),    // 'f'
-			ret(OpContinue, 1),    // 'o'
-			ret(OpContinue, 1),    // 'o'
-			ret(OpContinue, 1),    // '-'
-			ret(OpContinue, 1),    // '\\'
-			ret(OpContinue, 1),    // 'u'
-			ret(OpContinue, 1),    // '2'
-			ret(OpContinue, 1),    // '6'
-			ret(OpContinue, 1),    // '0'
-			ret(OpContinue, 1),    // '3'
-			ret(OpContinue, 1),    // '\\'
-			ret(OpContinue, 1),    // 'r'
-			ret(OpContinue, 1),    // '\\'
-			ret(OpContinue, 1),    // 'n'
-			ret(OpStringEnd, 1),   // '"'
-			eof(OpEOF),            // EOF
+		`1 `,
+		[]Event{
+			NumberStart,       // '1'
+			NumberEnd | Space, // ' '
+			None,              // EOF
 		},
 	},
 	{
-		`-0.123e+456`,
-		[]step{
-			ret(OpNumberStart, 1), // '-'
-			ret(OpContinue, 1),    // '0'
-			ret(OpContinue, 1),    // '.'
-			ret(OpContinue, 1),    // '1'
-			ret(OpContinue, 1),    // '2'
-			ret(OpContinue, 1),    // '3'
-			ret(OpContinue, 1),    // 'e'
-			ret(OpContinue, 1),    // '+'
-			ret(OpContinue, 1),    // '4'
-			ret(OpContinue, 1),    // '5'
-			ret(OpContinue, 1),    // '6'
-			eof(OpNumberEnd),      // EOF
-			eof(OpEOF),            // EOF (again)
+		`2.5 `,
+		[]Event{
+			NumberStart,       // '2'
+			None,              // '.'
+			None,              // '5'
+			NumberEnd | Space, // ' '
+			None,              // EOF
+		},
+	},
+	{
+		`0.1e+2`,
+		[]Event{
+			NumberStart, // '0'
+			None,        // '.'
+			None,        // '1'
+			None,        // 'e'
+			None,        // '+'
+			None,        // '2'
+			NumberEnd,   // EOF
+		},
+	},
+	{
+		`-1000E4`,
+		[]Event{
+			NumberStart, // '-'
+			None,        // '1'
+			None,        // '0'
+			None,        // '0'
+			None,        // '0'
+			None,        // 'E'
+			None,        // '4'
+			NumberEnd,   // EOF
 		},
 	},
 	{
 		`true`,
-		[]step{
-			ret(OpBoolStart, 1), // 't'
-			ret(OpContinue, 1),  // 'r'
-			ret(OpContinue, 1),  // 'u'
-			ret(OpBoolEnd, 1),   // 'e'
-			eof(OpEOF),          // EOF
+		[]Event{
+			BoolStart, // 't'
+			None,      // 'r'
+			None,      // 'u'
+			None,      // 'e'
+			BoolEnd,   // EOF
 		},
 	},
 	{
 		`false`,
-		[]step{
-			ret(OpBoolStart, 1), // 'f'
-			ret(OpContinue, 1),  // 'a'
-			ret(OpContinue, 1),  // 'l'
-			ret(OpContinue, 1),  // 's'
-			ret(OpBoolEnd, 1),   // 'e'
-			eof(OpEOF),          // EOF
+		[]Event{
+			BoolStart, // 'f'
+			None,      // 'a'
+			None,      // 'l'
+			None,      // 's'
+			None,      // 'e'
+			BoolEnd,   // EOF
 		},
 	},
 	{
 		`null`,
-		[]step{
-			ret(OpNullStart, 1), // 'n'
-			ret(OpContinue, 1),  // 'u'
-			ret(OpContinue, 1),  // 'l'
-			ret(OpNullEnd, 1),   // 'l'
-			eof(OpEOF),          // EOF
-		},
-	},
-	{
-		` " " `,
-		[]step{
-			ret(OpSpace, 1),       // ' '
-			ret(OpStringStart, 1), // '"'
-			ret(OpContinue, 1),    // ' '
-			ret(OpStringEnd, 1),   // '"'
-			ret(OpSpace, 1),       // ' '
-			eof(OpEOF),            // EOF
-		},
-	},
-	{
-		`"foo`,
-		[]step{
-			ret(OpStringStart, 1), // '"'
-			ret(OpContinue, 1),    // 'f'
-			ret(OpContinue, 1),    // 'o'
-			ret(OpContinue, 1),    // 'o'
-			eof(OpSyntaxError),    // 'EOF'
-		},
-	},
-	{
-		`1 2`,
-		[]step{
-			ret(OpNumberStart, 1), // '1'
-			ret(OpNumberEnd, 0),   // ' '
-			ret(OpSpace, 1),       // ' ' (again)
-			ret(OpSyntaxError, 0), // '2'
-		},
-	},
-	{
-		`0123`,
-		[]step{
-			ret(OpNumberStart, 1), // '0'
-			ret(OpSyntaxError, 0), // '1'
+		[]Event{
+			NullStart, // 'n'
+			None,      // 'u'
+			None,      // 'l'
+			None,      // 'l'
+			NullEnd,   // EOF
 		},
 	},
 }
 
 func TestScanner(t *testing.T) {
 	for _, test := range scannerTests {
-		var s Scanner
-		var l []string
-		var i int
+		var s = NewScanner()
+		var ev Event
 
-		for _, step := range test.steps {
-			n, desc := step(&s, test.input, i)
+		for i, want := range test.out {
+			if i < len(test.in) {
+				ev = s.Scan(test.in[i])
+			} else {
+				ev = s.End()
+			}
 
-			l = append(l, "  "+desc)
-			i += n
+			if ev != want {
+				t.Errorf("Scanner(%#q):", test.in)
 
-			if n < 0 {
-				t.Errorf("- %#q", test.input)
-				for _, s := range l {
-					t.Error(s)
+				for j, prev := range test.out[:i] {
+					if j < len(test.in) {
+						t.Errorf("  %4q -> %s", test.in[j], prev)
+					} else {
+						t.Errorf("   EOF -> %s", prev)
+					}
 				}
+
+				if i < len(test.in) {
+					t.Errorf("  %4q -> %s (want %s)", test.in[i], ev, test.out[i])
+				} else {
+					t.Errorf("   EOF -> %s (want %s)", ev, test.out[i])
+				}
+
 				break
 			}
-		}
-	}
-}
-
-// A step function describes a step in a scanner test case.
-type step func(s *Scanner, in string, i int) (int, string)
-
-func ret(wantOp Op, wantN int) step {
-	return func(s *Scanner, in string, i int) (int, string) {
-		op, n := s.Scan(in[i])
-		desc := fmt.Sprintf(".Scan(%q) -> %s, %d", in[i], op, n)
-
-		if op != wantOp || n != wantN {
-			return -1, fmt.Sprintf("%s (want %s, %d)", desc, wantOp, wantN)
-		} else {
-			return n, desc
-		}
-	}
-}
-
-func eof(wantOp Op) step {
-	return func(s *Scanner, in string, i int) (int, string) {
-		op := s.Eof()
-		desc := fmt.Sprintf(".Eof() -> %s", op)
-
-		if op != wantOp {
-			return -1, fmt.Sprintf("%s (want %s)", desc, wantOp)
-		} else {
-			return 0, desc
 		}
 	}
 }
