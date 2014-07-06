@@ -209,7 +209,19 @@ var scannerTests = []struct {
 		},
 	},
 	{
-		`-1000E4`,
+		`-0.003`,
+		[]Event{
+			NumberStart, // '-'
+			None,        // '0'
+			None,        // '.'
+			None,        // '0'
+			None,        // '0'
+			None,        // '3'
+			NumberEnd,   // EOF
+		},
+	},
+	{
+		`-1000E10`,
 		[]Event{
 			NumberStart, // '-'
 			None,        // '1'
@@ -217,7 +229,8 @@ var scannerTests = []struct {
 			None,        // '0'
 			None,        // '0'
 			None,        // 'E'
-			None,        // '4'
+			None,        // '1'
+			None,        // '0'
 			NumberEnd,   // EOF
 		},
 	},
