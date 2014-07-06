@@ -83,6 +83,13 @@ func (s *Scanner) next(c byte) Event {
 	return s.scan(s, c)
 }
 
+// delay schedules an end event to be returned for the next byte of input.
+func (s *Scanner) delay(ev Event) Event {
+	s.scan = scanDelay
+	s.end = ev
+	return None
+}
+
 func scanValue(s *Scanner, c byte) Event {
 	if c <= '9' {
 		if c >= '1' {
@@ -130,9 +137,7 @@ func scanObject(s *Scanner, c byte) Event {
 		s.push(scanKey)
 		return KeyStart
 	} else if c == '}' {
-		s.scan = scanDelay
-		s.end = ObjectEnd
-		return None
+		return s.delay(ObjectEnd)
 	}
 
 	return s.errorf("TODO")
@@ -159,9 +164,7 @@ func scanProperty(s *Scanner, c byte) Event {
 		s.push(scanKey)
 		return KeyStart
 	} else if c == '}' {
-		s.scan = scanDelay
-		s.end = ObjectEnd
-		return None
+		return s.delay(ObjectEnd)
 	}
 
 	return s.errorf("TODO")
@@ -171,9 +174,7 @@ func scanArray(s *Scanner, c byte) Event {
 	if isSpace(c) {
 		return Space
 	} else if c == ']' {
-		s.scan = scanDelay
-		s.end = ArrayEnd
-		return None
+		return s.delay(ArrayEnd)
 	}
 
 	s.push(scanElement)
@@ -188,9 +189,7 @@ func scanElement(s *Scanner, c byte) Event {
 		s.push(scanElement)
 		return None
 	} else if c == ']' {
-		s.scan = scanDelay
-		s.end = ArrayEnd
-		return None
+		return s.delay(ArrayEnd)
 	}
 
 	return s.errorf("TODO")
@@ -359,9 +358,7 @@ func scanTr(s *Scanner, c byte) Event {
 
 func scanTru(s *Scanner, c byte) Event {
 	if c == 'e' {
-		s.scan = scanDelay
-		s.end = BoolEnd
-		return None
+		return s.delay(BoolEnd)
 	}
 
 	return s.errorf("TODO")
@@ -396,9 +393,7 @@ func scanFal(s *Scanner, c byte) Event {
 
 func scanFals(s *Scanner, c byte) Event {
 	if c == 'e' {
-		s.scan = scanDelay
-		s.end = BoolEnd
-		return None
+		return s.delay(BoolEnd)
 	}
 
 	return s.errorf("TODO")
