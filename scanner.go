@@ -50,7 +50,7 @@ func (s *Scanner) End() Event {
 		return Error
 	}
 	if len(s.stack) > 0 {
-		return s.errorf("TODO")
+		return s.errorf(`unexpected end of JSON input`)
 	}
 
 	return ev
@@ -125,7 +125,7 @@ func beforeValue(s *Scanner, c byte) Event {
 		return NullStart
 	}
 
-	return s.errorf("TODO")
+	return s.errorf(`invalid character %q in place of value start`)
 }
 
 func beforeFirstObjectKey(s *Scanner, c byte) Event {
@@ -140,7 +140,7 @@ func beforeFirstObjectKey(s *Scanner, c byte) Event {
 		return s.delay(ObjectEnd)
 	}
 
-	return s.errorf("TODO")
+	return s.errorf(`invalid character %q in object`, c)
 }
 
 func afterObjectKey(s *Scanner, c byte) Event {
@@ -152,7 +152,7 @@ func afterObjectKey(s *Scanner, c byte) Event {
 		return None
 	}
 
-	return s.errorf("TODO")
+	return s.errorf(`invalid character %q after object key`, c)
 }
 
 func afterObjectValue(s *Scanner, c byte) Event {
@@ -165,7 +165,7 @@ func afterObjectValue(s *Scanner, c byte) Event {
 		return s.delay(ObjectEnd)
 	}
 
-	return s.errorf("TODO")
+	return s.errorf(`invalid character %q after object value`, c)
 }
 
 func afterObjectComma(s *Scanner, c byte) Event {
@@ -178,7 +178,7 @@ func afterObjectComma(s *Scanner, c byte) Event {
 		return KeyStart
 	}
 
-	return s.errorf("TODO")
+	return s.errorf(`invalid character %q in place of object key`, c)
 }
 
 func beforeFirstArrayElement(s *Scanner, c byte) Event {
@@ -203,7 +203,7 @@ func afterArrayElement(s *Scanner, c byte) Event {
 		return s.delay(ArrayEnd)
 	}
 
-	return s.errorf("TODO")
+	return s.errorf(`invalid character %q after array element`, c)
 }
 
 func afterQuote(s *Scanner, c byte) Event {
@@ -219,7 +219,7 @@ func afterQuote(s *Scanner, c byte) Event {
 		return None
 	}
 
-	return s.errorf("TODO")
+	return s.errorf(`invalid character %q in string literal`, c)
 }
 
 func afterEsc(s *Scanner, c byte) Event {
@@ -231,7 +231,7 @@ func afterEsc(s *Scanner, c byte) Event {
 		return None
 	}
 
-	return s.errorf("TODO")
+	return s.errorf(`invalid character %q in character escape`, c)
 }
 
 func afterEscU(s *Scanner, c byte) Event {
@@ -240,7 +240,7 @@ func afterEscU(s *Scanner, c byte) Event {
 		return None
 	}
 
-	return s.errorf("TODO")
+	return s.errorf(`invalid character %q in hexadecimal character escape`, c)
 }
 
 func afterEscU1(s *Scanner, c byte) Event {
@@ -249,7 +249,7 @@ func afterEscU1(s *Scanner, c byte) Event {
 		return None
 	}
 
-	return s.errorf("TODO")
+	return s.errorf(`invalid character %q in hexadecimal character escape`, c)
 }
 
 func afterEscU12(s *Scanner, c byte) Event {
@@ -258,7 +258,7 @@ func afterEscU12(s *Scanner, c byte) Event {
 		return None
 	}
 
-	return s.errorf("TODO")
+	return s.errorf(`invalid character %q in hexadecimal character escape`, c)
 }
 
 func afterEscU123(s *Scanner, c byte) Event {
@@ -267,7 +267,7 @@ func afterEscU123(s *Scanner, c byte) Event {
 		return None
 	}
 
-	return s.errorf("TODO")
+	return s.errorf(`invalid character %q in hexadecimal character escape`, c)
 }
 
 func afterMinus(s *Scanner, c byte) Event {
@@ -279,7 +279,7 @@ func afterMinus(s *Scanner, c byte) Event {
 		return None
 	}
 
-	return s.errorf("TODO")
+	return s.errorf(`invalid character %q after "-"`, c)
 }
 
 func afterZero(s *Scanner, c byte) Event {
@@ -308,7 +308,7 @@ func afterDot(s *Scanner, c byte) Event {
 		return None
 	}
 
-	return s.errorf("TODO")
+	return s.errorf(`invalid character %q after decimal point in numeric literal`, c)
 }
 
 func afterDotDigit(s *Scanner, c byte) Event {
@@ -331,7 +331,7 @@ func afterE(s *Scanner, c byte) Event {
 		return None
 	}
 
-	return s.errorf("TODO")
+	return s.errorf(`invalid character %q in exponent of numeric literal`, c)
 }
 
 func afterESign(s *Scanner, c byte) Event {
@@ -340,7 +340,7 @@ func afterESign(s *Scanner, c byte) Event {
 		return None
 	}
 
-	return s.errorf("TODO")
+	return s.errorf(`invalid character %q in exponent of numeric literal`, c)
 }
 
 func afterEDigit(s *Scanner, c byte) Event {
@@ -357,7 +357,7 @@ func afterT(s *Scanner, c byte) Event {
 		return None
 	}
 
-	return s.errorf("TODO")
+	return s.errorf(`invalid character %q after "t"`, c)
 }
 
 func afterTr(s *Scanner, c byte) Event {
@@ -366,7 +366,7 @@ func afterTr(s *Scanner, c byte) Event {
 		return None
 	}
 
-	return s.errorf("TODO")
+	return s.errorf(`invalid character %q after "tr"`, c)
 }
 
 func afterTru(s *Scanner, c byte) Event {
@@ -374,7 +374,7 @@ func afterTru(s *Scanner, c byte) Event {
 		return s.delay(BoolEnd)
 	}
 
-	return s.errorf("TODO")
+	return s.errorf(`invalid character %q after "tru"`, c)
 }
 
 func afterF(s *Scanner, c byte) Event {
@@ -383,7 +383,7 @@ func afterF(s *Scanner, c byte) Event {
 		return None
 	}
 
-	return s.errorf("TODO")
+	return s.errorf(`invalid character %q after "f"`, c)
 }
 
 func afterFa(s *Scanner, c byte) Event {
@@ -392,7 +392,7 @@ func afterFa(s *Scanner, c byte) Event {
 		return None
 	}
 
-	return s.errorf("TODO")
+	return s.errorf(`invalid character %q after "fa"`, c)
 }
 
 func afterFal(s *Scanner, c byte) Event {
@@ -401,7 +401,7 @@ func afterFal(s *Scanner, c byte) Event {
 		return None
 	}
 
-	return s.errorf("TODO")
+	return s.errorf(`invalid character %q after "fal"`, c)
 }
 
 func afterFals(s *Scanner, c byte) Event {
@@ -409,7 +409,7 @@ func afterFals(s *Scanner, c byte) Event {
 		return s.delay(BoolEnd)
 	}
 
-	return s.errorf("TODO")
+	return s.errorf(`invalid character %q after "fals"`, c)
 }
 
 func afterN(s *Scanner, c byte) Event {
@@ -418,7 +418,7 @@ func afterN(s *Scanner, c byte) Event {
 		return None
 	}
 
-	return s.errorf("TODO")
+	return s.errorf(`invalid character %q after "n"`, c)
 }
 
 func afterNu(s *Scanner, c byte) Event {
@@ -427,7 +427,7 @@ func afterNu(s *Scanner, c byte) Event {
 		return None
 	}
 
-	return s.errorf("TODO")
+	return s.errorf(`invalid character %q after "nu"`, c)
 }
 
 func afterNul(s *Scanner, c byte) Event {
@@ -435,7 +435,7 @@ func afterNul(s *Scanner, c byte) Event {
 		return s.delay(NullEnd)
 	}
 
-	return s.errorf("TODO")
+	return s.errorf(`invalid character %q after "nul"`, c)
 }
 
 func delayed(s *Scanner, c byte) Event {
@@ -447,7 +447,7 @@ func afterTopValue(s *Scanner, c byte) Event {
 		return Space
 	}
 
-	return s.errorf("TODO")
+	return s.errorf(`invalid character %q after top-level value`, c)
 }
 
 func afterError(s *Scanner, c byte) Event {
