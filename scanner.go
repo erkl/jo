@@ -59,7 +59,7 @@ func (s *Scanner) End() Event {
 // LastError returns a syntax error description after either Scan or End has
 // returned an Error event.
 func (s *Scanner) LastError() error {
-	return nil
+	return s.err
 }
 
 // errorf generates and persists an error.
