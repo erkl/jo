@@ -86,6 +86,8 @@ func scanValue(s *Scanner, c byte) Event {
 		if c >= '1' {
 			s.scan = scanDigit
 			return NumberStart
+		} else if isSpace(c) {
+			return Space
 		} else if c == '"' {
 			// TODO
 		} else if c == '-' {
