@@ -13,6 +13,9 @@ type Scanner struct {
 	// Scheduled state.
 	stack []func(*Scanner, byte) Event
 
+	// Used when delaying end events.
+	end Event
+
 	// Persisted syntax error.
 	err error
 }
@@ -97,11 +100,14 @@ func scanValue(s *Scanner, c byte) Event {
 	} else if c == '[' {
 		// TODO
 	} else if c == 't' {
-		// TODO
+		s.scan = scanT
+		return BoolStart
 	} else if c == 'f' {
-		// TODO
+		s.scan = scanF
+		return BoolStart
 	} else if c == 'n' {
-		// TODO
+		s.scan = scanN
+		return NullStart
 	}
 
 	return s.errorf("TODO")
@@ -189,6 +195,104 @@ func scanEDigit(s *Scanner, c byte) Event {
 
 	s.pop()
 	return s.scan(s, c) | NumberEnd
+}
+
+func scanT(s *Scanner, c byte) Event {
+	if c == 'r' {
+		s.scan = scanTr
+		return None
+	}
+
+	return s.errorf("TODO")
+}
+
+func scanTr(s *Scanner, c byte) Event {
+	if c == 'u' {
+		s.scan = scanTru
+		return None
+	}
+
+	return s.errorf("TODO")
+}
+
+func scanTru(s *Scanner, c byte) Event {
+	if c == 'e' {
+		s.scan = scanDelay
+		s.end = BoolEnd
+		return None
+	}
+
+	return s.errorf("TODO")
+}
+
+func scanF(s *Scanner, c byte) Event {
+	if c == 'a' {
+		s.scan = scanFa
+		return None
+	}
+
+	return s.errorf("TODO")
+}
+
+func scanFa(s *Scanner, c byte) Event {
+	if c == 'l' {
+		s.scan = scanFal
+		return None
+	}
+
+	return s.errorf("TODO")
+}
+
+func scanFal(s *Scanner, c byte) Event {
+	if c == 's' {
+		s.scan = scanFals
+		return None
+	}
+
+	return s.errorf("TODO")
+}
+
+func scanFals(s *Scanner, c byte) Event {
+	if c == 'e' {
+		s.scan = scanDelay
+		s.end = BoolEnd
+		return None
+	}
+
+	return s.errorf("TODO")
+}
+
+func scanN(s *Scanner, c byte) Event {
+	if c == 'u' {
+		s.scan = scanNu
+		return None
+	}
+
+	return s.errorf("TODO")
+}
+
+func scanNu(s *Scanner, c byte) Event {
+	if c == 'l' {
+		s.scan = scanNul
+		return None
+	}
+
+	return s.errorf("TODO")
+}
+
+func scanNul(s *Scanner, c byte) Event {
+	if c == 'l' {
+		s.scan = scanDelay
+		s.end = NullEnd
+		return None
+	}
+
+	return s.errorf("TODO")
+}
+
+func scanDelay(s *Scanner, c byte) Event {
+	s.pop()
+	return s.scan(s, c) | s.end
 }
 
 func scanEnd(s *Scanner, c byte) Event {
