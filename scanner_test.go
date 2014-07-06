@@ -20,17 +20,14 @@ var scannerTests = []struct {
 		},
 	},
 	{
-		" \" \tbar\r\n\"\n ",
+		" \" bar\"\n ",
 		[]Event{
 			Space,             // ' '
 			StringStart,       // '"'
 			None,              // ' '
-			None,              // '\t'
 			None,              // 'b'
 			None,              // 'a'
 			None,              // 'r'
-			None,              // '\r'
-			None,              // '\n'
 			None,              // '"'
 			StringEnd | Space, // '\n'
 			Space,             // ' '
