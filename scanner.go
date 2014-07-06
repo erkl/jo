@@ -100,7 +100,8 @@ func scanValue(s *Scanner, c byte) Event {
 			return NumberStart
 		}
 	} else if c == '{' {
-		// TODO
+		s.scan = scanObject
+		return ObjectStart
 	} else if c == '[' {
 		s.scan = scanArray
 		return ArrayStart
@@ -113,6 +114,52 @@ func scanValue(s *Scanner, c byte) Event {
 	} else if c == 'n' {
 		s.scan = scanN
 		return NullStart
+	}
+
+	return s.errorf("TODO")
+}
+
+func scanObject(s *Scanner, c byte) Event {
+	if isSpace(c) {
+		return Space
+	} else if c == '"' {
+		s.scan = scanInString
+		s.end = KeyEnd
+		s.push(scanKey)
+		return KeyStart
+	} else if c == '}' {
+		s.scan = scanDelay
+		s.end = ObjectEnd
+		return None
+	}
+
+	return s.errorf("TODO")
+}
+
+func scanKey(s *Scanner, c byte) Event {
+	if isSpace(c) {
+		return Space
+	} else if c == ':' {
+		s.scan = scanValue
+		s.push(scanProperty)
+		return None
+	}
+
+	return s.errorf("TODO")
+}
+
+func scanProperty(s *Scanner, c byte) Event {
+	if isSpace(c) {
+		return Space
+	} else if c == ',' {
+		s.scan = scanInString
+		s.end = KeyEnd
+		s.push(scanKey)
+		return KeyStart
+	} else if c == '}' {
+		s.scan = scanDelay
+		s.end = ObjectEnd
+		return None
 	}
 
 	return s.errorf("TODO")
