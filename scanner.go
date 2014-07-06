@@ -74,11 +74,13 @@ func (s *Scanner) push(fn func(*Scanner, byte) Event) {
 	s.stack = append(s.stack, fn)
 }
 
-// Move the top scan function to s.scan.
-func (s *Scanner) pop() {
+// next pops the next state function off the stack and invokes it.
+func (s *Scanner) next(c byte) Event {
 	n := len(s.stack) - 1
 	s.scan = s.stack[n]
 	s.stack = s.stack[:n]
+
+	return s.scan(s, c)
 }
 
 func scanValue(s *Scanner, c byte) Event {
@@ -277,8 +279,7 @@ func scanZero(s *Scanner, c byte) Event {
 		return None
 	}
 
-	s.pop()
-	return s.scan(s, c) | NumberEnd
+	return s.next(c) | NumberEnd
 }
 
 func scanDigit(s *Scanner, c byte) Event {
@@ -306,8 +307,7 @@ func scanDotDigit(s *Scanner, c byte) Event {
 		return None
 	}
 
-	s.pop()
-	return s.scan(s, c) | NumberEnd
+	return s.next(c) | NumberEnd
 }
 
 func scanE(s *Scanner, c byte) Event {
@@ -336,8 +336,7 @@ func scanEDigit(s *Scanner, c byte) Event {
 		return None
 	}
 
-	s.pop()
-	return s.scan(s, c) | NumberEnd
+	return s.next(c) | NumberEnd
 }
 
 func scanT(s *Scanner, c byte) Event {
@@ -425,17 +424,14 @@ func scanNu(s *Scanner, c byte) Event {
 
 func scanNul(s *Scanner, c byte) Event {
 	if c == 'l' {
-		s.scan = scanDelay
-		s.end = NullEnd
-		return None
+		return s.delay(NullEnd)
 	}
 
 	return s.errorf("TODO")
 }
 
 func scanDelay(s *Scanner, c byte) Event {
-	s.pop()
-	return s.scan(s, c) | s.end
+	return s.next(c) | s.end
 }
 
 func scanEnd(s *Scanner, c byte) Event {
