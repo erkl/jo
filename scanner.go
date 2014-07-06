@@ -90,6 +90,7 @@ func scanValue(s *Scanner, c byte) Event {
 			return Space
 		} else if c == '"' {
 			s.scan = scanInString
+			s.end = StringEnd
 			return StringStart
 		} else if c == '-' {
 			s.scan = scanNeg
@@ -149,7 +150,6 @@ func scanElement(s *Scanner, c byte) Event {
 func scanInString(s *Scanner, c byte) Event {
 	if c == '"' {
 		s.scan = scanDelay
-		s.end = StringEnd
 		return None
 	} else if c == '\\' {
 		s.scan = scanInStringEsc
