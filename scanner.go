@@ -89,7 +89,8 @@ func scanValue(s *Scanner, c byte) Event {
 		} else if isSpace(c) {
 			return Space
 		} else if c == '"' {
-			// TODO
+			s.scan = scanInString
+			return StringStart
 		} else if c == '-' {
 			s.scan = scanNeg
 			return NumberStart
@@ -110,6 +111,69 @@ func scanValue(s *Scanner, c byte) Event {
 	} else if c == 'n' {
 		s.scan = scanN
 		return NullStart
+	}
+
+	return s.errorf("TODO")
+}
+
+func scanInString(s *Scanner, c byte) Event {
+	if c == '"' {
+		s.scan = scanDelay
+		s.end = StringEnd
+		return None
+	} else if c == '\\' {
+		s.scan = scanInStringEsc
+		return None
+	} else if c >= 0x20 {
+		return None
+	}
+
+	return s.errorf("TODO")
+}
+
+func scanInStringEsc(s *Scanner, c byte) Event {
+	if isEsc(c) {
+		s.scan = scanInString
+		return None
+	} else if c == 'u' {
+		s.scan = scanInStringEscU
+		return None
+	}
+
+	return s.errorf("TODO")
+}
+
+func scanInStringEscU(s *Scanner, c byte) Event {
+	if isHex(c) {
+		s.scan = scanInStringEscU1
+		return None
+	}
+
+	return s.errorf("TODO")
+}
+
+func scanInStringEscU1(s *Scanner, c byte) Event {
+	if isHex(c) {
+		s.scan = scanInStringEscU12
+		return None
+	}
+
+	return s.errorf("TODO")
+}
+
+func scanInStringEscU12(s *Scanner, c byte) Event {
+	if isHex(c) {
+		s.scan = scanInStringEscU123
+		return None
+	}
+
+	return s.errorf("TODO")
+}
+
+func scanInStringEscU123(s *Scanner, c byte) Event {
+	if isHex(c) {
+		s.scan = scanInString
+		return None
 	}
 
 	return s.errorf("TODO")
