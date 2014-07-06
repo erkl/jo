@@ -24,6 +24,14 @@ var eventStringTests = []struct {
 		NumberEnd | Space,
 		"NumberEnd | Space",
 	},
+	{
+		ObjectEnd | KeyEnd | ArrayEnd | StringEnd | NumberEnd | BoolEnd | NullEnd | ObjectStart | KeyStart | ArrayStart | StringStart | NumberStart | BoolStart | NullStart | Space,
+		"ObjectEnd | KeyEnd | ArrayEnd | StringEnd | NumberEnd | BoolEnd | NullEnd | ObjectStart | KeyStart | ArrayStart | StringStart | NumberStart | BoolStart | NullStart | Space",
+	},
+	{
+		Error - 1,
+		"INVALID",
+	},
 }
 
 func TestEventString(t *testing.T) {
