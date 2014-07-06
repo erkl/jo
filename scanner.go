@@ -69,7 +69,7 @@ func (s *Scanner) errorf(str string, args ...interface{}) Event {
 	return Error
 }
 
-// Push another state function onto the stack.
+// push pushes a state function onto the stack.
 func (s *Scanner) push(fn func(*Scanner, byte) Event) {
 	s.stack = append(s.stack, fn)
 }
