@@ -8,7 +8,7 @@ import (
 // input.
 type Scanner struct {
 	// Current state.
-	scan func(*Scanner, byte) Event
+	state func(*Scanner, byte) Event
 
 	// Scheduled state.
 	stack []func(*Scanner, byte) Event
@@ -29,22 +29,22 @@ func NewScanner() *Scanner {
 
 // Reset restores a Scanner to its initial state.
 func (s *Scanner) Reset() {
-	s.scan = scanValue
+	s.state = scanValue
 	s.stack = append(s.stack[:0], scanEnd)
 	s.err = nil
 }
 
 // Scan accepts a byte of input and returns an Event.
 func (s *Scanner) Scan(c byte) Event {
-	return s.scan(s, c)
+	return s.state(s, c)
 }
 
 // End signals the Scanner that the end of input has been reached. It returns
 // an event just as Scan does.
 func (s *Scanner) End() Event {
-	// Feeding the scan function whitespace will for NumberEnd events.
+	// Feeding the state function whitespace will for NumberEnd events.
 	// Note the bitwise operation to filter out the Space bit.
-	ev := s.scan(s, ' ') & (^Space)
+	ev := s.state(s, ' ') & (^Space)
 
 	if s.err != nil {
 		return Error
@@ -64,12 +64,12 @@ func (s *Scanner) LastError() error {
 
 // errorf generates and persists an error.
 func (s *Scanner) errorf(str string, args ...interface{}) Event {
-	s.scan = scanError
+	s.state = scanError
 	s.err = fmt.Errorf(str, args...)
 	return Error
 }
 
-// Push another scan function onto the stack.
+// Push another state function onto the stack.
 func (s *Scanner) push(fn func(*Scanner, byte) Event) {
 	s.stack = append(s.stack, fn)
 }
@@ -77,15 +77,15 @@ func (s *Scanner) push(fn func(*Scanner, byte) Event) {
 // next pops the next state function off the stack and invokes it.
 func (s *Scanner) next(c byte) Event {
 	n := len(s.stack) - 1
-	s.scan = s.stack[n]
+	s.state = s.stack[n]
 	s.stack = s.stack[:n]
 
-	return s.scan(s, c)
+	return s.state(s, c)
 }
 
 // delay schedules an end event to be returned for the next byte of input.
 func (s *Scanner) delay(ev Event) Event {
-	s.scan = scanDelay
+	s.state = scanDelay
 	s.end = ev
 	return None
 }
@@ -93,35 +93,35 @@ func (s *Scanner) delay(ev Event) Event {
 func scanValue(s *Scanner, c byte) Event {
 	if c <= '9' {
 		if c >= '1' {
-			s.scan = scanDigit
+			s.state = scanDigit
 			return NumberStart
 		} else if isSpace(c) {
 			return Space
 		} else if c == '"' {
-			s.scan = scanInString
+			s.state = scanInString
 			s.end = StringEnd
 			return StringStart
 		} else if c == '-' {
-			s.scan = scanNeg
+			s.state = scanNeg
 			return NumberStart
 		} else if c == '0' {
-			s.scan = scanZero
+			s.state = scanZero
 			return NumberStart
 		}
 	} else if c == '{' {
-		s.scan = scanObject
+		s.state = scanObject
 		return ObjectStart
 	} else if c == '[' {
-		s.scan = scanArray
+		s.state = scanArray
 		return ArrayStart
 	} else if c == 't' {
-		s.scan = scanT
+		s.state = scanT
 		return BoolStart
 	} else if c == 'f' {
-		s.scan = scanF
+		s.state = scanF
 		return BoolStart
 	} else if c == 'n' {
-		s.scan = scanN
+		s.state = scanN
 		return NullStart
 	}
 
@@ -132,7 +132,7 @@ func scanObject(s *Scanner, c byte) Event {
 	if isSpace(c) {
 		return Space
 	} else if c == '"' {
-		s.scan = scanInString
+		s.state = scanInString
 		s.end = KeyEnd
 		s.push(scanKey)
 		return KeyStart
@@ -147,7 +147,7 @@ func scanKey(s *Scanner, c byte) Event {
 	if isSpace(c) {
 		return Space
 	} else if c == ':' {
-		s.scan = scanValue
+		s.state = scanValue
 		s.push(scanProperty)
 		return None
 	}
@@ -159,7 +159,7 @@ func scanProperty(s *Scanner, c byte) Event {
 	if isSpace(c) {
 		return Space
 	} else if c == ',' {
-		s.scan = scanInString
+		s.state = scanInString
 		s.end = KeyEnd
 		s.push(scanKey)
 		return KeyStart
@@ -185,7 +185,7 @@ func scanElement(s *Scanner, c byte) Event {
 	if isSpace(c) {
 		return Space
 	} else if c == ',' {
-		s.scan = scanValue
+		s.state = scanValue
 		s.push(scanElement)
 		return None
 	} else if c == ']' {
@@ -197,10 +197,10 @@ func scanElement(s *Scanner, c byte) Event {
 
 func scanInString(s *Scanner, c byte) Event {
 	if c == '"' {
-		s.scan = scanDelay
+		s.state = scanDelay
 		return None
 	} else if c == '\\' {
-		s.scan = scanInStringEsc
+		s.state = scanInStringEsc
 		return None
 	} else if c >= 0x20 {
 		return None
@@ -211,10 +211,10 @@ func scanInString(s *Scanner, c byte) Event {
 
 func scanInStringEsc(s *Scanner, c byte) Event {
 	if isEsc(c) {
-		s.scan = scanInString
+		s.state = scanInString
 		return None
 	} else if c == 'u' {
-		s.scan = scanInStringEscU
+		s.state = scanInStringEscU
 		return None
 	}
 
@@ -223,7 +223,7 @@ func scanInStringEsc(s *Scanner, c byte) Event {
 
 func scanInStringEscU(s *Scanner, c byte) Event {
 	if isHex(c) {
-		s.scan = scanInStringEscU1
+		s.state = scanInStringEscU1
 		return None
 	}
 
@@ -232,7 +232,7 @@ func scanInStringEscU(s *Scanner, c byte) Event {
 
 func scanInStringEscU1(s *Scanner, c byte) Event {
 	if isHex(c) {
-		s.scan = scanInStringEscU12
+		s.state = scanInStringEscU12
 		return None
 	}
 
@@ -241,7 +241,7 @@ func scanInStringEscU1(s *Scanner, c byte) Event {
 
 func scanInStringEscU12(s *Scanner, c byte) Event {
 	if isHex(c) {
-		s.scan = scanInStringEscU123
+		s.state = scanInStringEscU123
 		return None
 	}
 
@@ -250,7 +250,7 @@ func scanInStringEscU12(s *Scanner, c byte) Event {
 
 func scanInStringEscU123(s *Scanner, c byte) Event {
 	if isHex(c) {
-		s.scan = scanInString
+		s.state = scanInString
 		return None
 	}
 
@@ -259,10 +259,10 @@ func scanInStringEscU123(s *Scanner, c byte) Event {
 
 func scanNeg(s *Scanner, c byte) Event {
 	if c == '0' {
-		s.scan = scanZero
+		s.state = scanZero
 		return None
 	} else if '1' <= c && c <= '9' {
-		s.scan = scanDigit
+		s.state = scanDigit
 		return None
 	}
 
@@ -271,10 +271,10 @@ func scanNeg(s *Scanner, c byte) Event {
 
 func scanZero(s *Scanner, c byte) Event {
 	if c == '.' {
-		s.scan = scanDot
+		s.state = scanDot
 		return None
 	} else if c == 'e' || c == 'E' {
-		s.scan = scanE
+		s.state = scanE
 		return None
 	}
 
@@ -291,7 +291,7 @@ func scanDigit(s *Scanner, c byte) Event {
 
 func scanDot(s *Scanner, c byte) Event {
 	if isDigit(c) {
-		s.scan = scanDotDigit
+		s.state = scanDotDigit
 		return None
 	}
 
@@ -302,7 +302,7 @@ func scanDotDigit(s *Scanner, c byte) Event {
 	if isDigit(c) {
 		return None
 	} else if c == 'e' || c == 'E' {
-		s.scan = scanE
+		s.state = scanE
 		return None
 	}
 
@@ -311,10 +311,10 @@ func scanDotDigit(s *Scanner, c byte) Event {
 
 func scanE(s *Scanner, c byte) Event {
 	if isDigit(c) {
-		s.scan = scanEDigit
+		s.state = scanEDigit
 		return None
 	} else if c == '-' || c == '+' {
-		s.scan = scanESign
+		s.state = scanESign
 		return None
 	}
 
@@ -323,7 +323,7 @@ func scanE(s *Scanner, c byte) Event {
 
 func scanESign(s *Scanner, c byte) Event {
 	if isDigit(c) {
-		s.scan = scanEDigit
+		s.state = scanEDigit
 		return None
 	}
 
@@ -340,7 +340,7 @@ func scanEDigit(s *Scanner, c byte) Event {
 
 func scanT(s *Scanner, c byte) Event {
 	if c == 'r' {
-		s.scan = scanTr
+		s.state = scanTr
 		return None
 	}
 
@@ -349,7 +349,7 @@ func scanT(s *Scanner, c byte) Event {
 
 func scanTr(s *Scanner, c byte) Event {
 	if c == 'u' {
-		s.scan = scanTru
+		s.state = scanTru
 		return None
 	}
 
@@ -366,7 +366,7 @@ func scanTru(s *Scanner, c byte) Event {
 
 func scanF(s *Scanner, c byte) Event {
 	if c == 'a' {
-		s.scan = scanFa
+		s.state = scanFa
 		return None
 	}
 
@@ -375,7 +375,7 @@ func scanF(s *Scanner, c byte) Event {
 
 func scanFa(s *Scanner, c byte) Event {
 	if c == 'l' {
-		s.scan = scanFal
+		s.state = scanFal
 		return None
 	}
 
@@ -384,7 +384,7 @@ func scanFa(s *Scanner, c byte) Event {
 
 func scanFal(s *Scanner, c byte) Event {
 	if c == 's' {
-		s.scan = scanFals
+		s.state = scanFals
 		return None
 	}
 
@@ -401,7 +401,7 @@ func scanFals(s *Scanner, c byte) Event {
 
 func scanN(s *Scanner, c byte) Event {
 	if c == 'u' {
-		s.scan = scanNu
+		s.state = scanNu
 		return None
 	}
 
@@ -410,7 +410,7 @@ func scanN(s *Scanner, c byte) Event {
 
 func scanNu(s *Scanner, c byte) Event {
 	if c == 'l' {
-		s.scan = scanNul
+		s.state = scanNul
 		return None
 	}
 
