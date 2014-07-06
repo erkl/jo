@@ -20,7 +20,7 @@ var scannerTests = []struct {
 		},
 	},
 	{
-		`{ "a": { "b":{} } }`,
+		`{ "a": { "b":{} , "c" : 0} }`,
 		[]Event{
 			ObjectStart,       // '{'
 			Space,             // ' '
@@ -38,7 +38,16 @@ var scannerTests = []struct {
 			ObjectStart,       // '{'
 			None,              // '}'
 			ObjectEnd | Space, // ' '
-			None,              // '}'
+			None,              // ','
+			Space,             // ' '
+			KeyStart,          // '"'
+			None,              // 'c'
+			None,              // '"'
+			KeyEnd | Space,    // ' '
+			None,              // ':'
+			Space,             // ' '
+			NumberStart,       // '0'
+			NumberEnd,         // '}'
 			ObjectEnd | Space, // ' '
 			None,              // '}'
 			ObjectEnd,         // EOF

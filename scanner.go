@@ -159,12 +159,23 @@ func afterObjectValue(s *Scanner, c byte) Event {
 	if isSpace(c) {
 		return Space
 	} else if c == ',' {
+		s.state = afterObjectComma
+		return None
+	} else if c == '}' {
+		return s.delay(ObjectEnd)
+	}
+
+	return s.errorf("TODO")
+}
+
+func afterObjectComma(s *Scanner, c byte) Event {
+	if isSpace(c) {
+		return Space
+	} else if c == '"' {
 		s.state = afterQuote
 		s.end = KeyEnd
 		s.push(afterObjectKey)
 		return KeyStart
-	} else if c == '}' {
-		return s.delay(ObjectEnd)
 	}
 
 	return s.errorf("TODO")
