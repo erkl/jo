@@ -301,3 +301,24 @@ func TestScanner(t *testing.T) {
 		}
 	}
 }
+
+func TestScannerErrors(t *testing.T) {
+	var s = NewScanner()
+
+	if s.Scan('1') != NumberStart || s.Scan('x') != Error {
+		t.Fatalf("setup failed")
+	}
+
+	err := s.LastError()
+	if err == nil {
+		t.Fatalf("Scanner.LastError returned nil after Error event")
+	}
+
+	if s.Scan('2') != Error || s.LastError().Error() != err.Error() {
+		t.Fatalf("Scanner.Scan did not remember previous error")
+	}
+
+	if s.End() != Error || s.LastError().Error() != err.Error() {
+		t.Fatalf("Scanner.End did not remember previous error")
+	}
+}
