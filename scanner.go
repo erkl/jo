@@ -29,8 +29,8 @@ func NewScanner() *Scanner {
 
 // Reset restores a Scanner to its initial state.
 func (s *Scanner) Reset() {
-	s.state = scanValue
-	s.stack = append(s.stack[:0], scanEnd)
+	s.state = beforeValue
+	s.stack = append(s.stack[:0], afterTopValue)
 	s.err = nil
 }
 
@@ -64,7 +64,7 @@ func (s *Scanner) LastError() error {
 
 // errorf generates and persists an error.
 func (s *Scanner) errorf(str string, args ...interface{}) Event {
-	s.state = scanError
+	s.state = afterError
 	s.err = fmt.Errorf(str, args...)
 	return Error
 }
@@ -85,56 +85,56 @@ func (s *Scanner) next(c byte) Event {
 
 // delay schedules an end event to be returned for the next byte of input.
 func (s *Scanner) delay(ev Event) Event {
-	s.state = scanDelay
+	s.state = delayed
 	s.end = ev
 	return None
 }
 
-func scanValue(s *Scanner, c byte) Event {
+func beforeValue(s *Scanner, c byte) Event {
 	if c <= '9' {
 		if c >= '1' {
-			s.state = scanDigit
+			s.state = afterDigit
 			return NumberStart
 		} else if isSpace(c) {
 			return Space
 		} else if c == '"' {
-			s.state = scanInString
+			s.state = afterQuote
 			s.end = StringEnd
 			return StringStart
 		} else if c == '-' {
-			s.state = scanNeg
+			s.state = afterMinus
 			return NumberStart
 		} else if c == '0' {
-			s.state = scanZero
+			s.state = afterZero
 			return NumberStart
 		}
 	} else if c == '{' {
-		s.state = scanObject
+		s.state = beforeFirstObjectKey
 		return ObjectStart
 	} else if c == '[' {
-		s.state = scanArray
+		s.state = beforeFirstArrayElement
 		return ArrayStart
 	} else if c == 't' {
-		s.state = scanT
+		s.state = afterT
 		return BoolStart
 	} else if c == 'f' {
-		s.state = scanF
+		s.state = afterF
 		return BoolStart
 	} else if c == 'n' {
-		s.state = scanN
+		s.state = afterN
 		return NullStart
 	}
 
 	return s.errorf("TODO")
 }
 
-func scanObject(s *Scanner, c byte) Event {
+func beforeFirstObjectKey(s *Scanner, c byte) Event {
 	if isSpace(c) {
 		return Space
 	} else if c == '"' {
-		s.state = scanInString
+		s.state = afterQuote
 		s.end = KeyEnd
-		s.push(scanKey)
+		s.push(afterObjectKey)
 		return KeyStart
 	} else if c == '}' {
 		return s.delay(ObjectEnd)
@@ -143,25 +143,25 @@ func scanObject(s *Scanner, c byte) Event {
 	return s.errorf("TODO")
 }
 
-func scanKey(s *Scanner, c byte) Event {
+func afterObjectKey(s *Scanner, c byte) Event {
 	if isSpace(c) {
 		return Space
 	} else if c == ':' {
-		s.state = scanValue
-		s.push(scanProperty)
+		s.state = beforeValue
+		s.push(afterObjectValue)
 		return None
 	}
 
 	return s.errorf("TODO")
 }
 
-func scanProperty(s *Scanner, c byte) Event {
+func afterObjectValue(s *Scanner, c byte) Event {
 	if isSpace(c) {
 		return Space
 	} else if c == ',' {
-		s.state = scanInString
+		s.state = afterQuote
 		s.end = KeyEnd
-		s.push(scanKey)
+		s.push(afterObjectKey)
 		return KeyStart
 	} else if c == '}' {
 		return s.delay(ObjectEnd)
@@ -170,23 +170,23 @@ func scanProperty(s *Scanner, c byte) Event {
 	return s.errorf("TODO")
 }
 
-func scanArray(s *Scanner, c byte) Event {
+func beforeFirstArrayElement(s *Scanner, c byte) Event {
 	if isSpace(c) {
 		return Space
 	} else if c == ']' {
 		return s.delay(ArrayEnd)
 	}
 
-	s.push(scanElement)
-	return scanValue(s, c)
+	s.push(afterArrayElement)
+	return beforeValue(s, c)
 }
 
-func scanElement(s *Scanner, c byte) Event {
+func afterArrayElement(s *Scanner, c byte) Event {
 	if isSpace(c) {
 		return Space
 	} else if c == ',' {
-		s.state = scanValue
-		s.push(scanElement)
+		s.state = beforeValue
+		s.push(afterArrayElement)
 		return None
 	} else if c == ']' {
 		return s.delay(ArrayEnd)
@@ -195,12 +195,14 @@ func scanElement(s *Scanner, c byte) Event {
 	return s.errorf("TODO")
 }
 
-func scanInString(s *Scanner, c byte) Event {
+func afterQuote(s *Scanner, c byte) Event {
 	if c == '"' {
-		s.state = scanDelay
+		// At thie point, s.end has already been set to either StringEnd or
+		// KeyEnd depending on the previous state function.
+		s.state = delayed
 		return None
 	} else if c == '\\' {
-		s.state = scanInStringEsc
+		s.state = afterEsc
 		return None
 	} else if c >= 0x20 {
 		return None
@@ -209,128 +211,128 @@ func scanInString(s *Scanner, c byte) Event {
 	return s.errorf("TODO")
 }
 
-func scanInStringEsc(s *Scanner, c byte) Event {
+func afterEsc(s *Scanner, c byte) Event {
 	if isEsc(c) {
-		s.state = scanInString
+		s.state = afterQuote
 		return None
 	} else if c == 'u' {
-		s.state = scanInStringEscU
+		s.state = afterEscU
 		return None
 	}
 
 	return s.errorf("TODO")
 }
 
-func scanInStringEscU(s *Scanner, c byte) Event {
+func afterEscU(s *Scanner, c byte) Event {
 	if isHex(c) {
-		s.state = scanInStringEscU1
+		s.state = afterEscU1
 		return None
 	}
 
 	return s.errorf("TODO")
 }
 
-func scanInStringEscU1(s *Scanner, c byte) Event {
+func afterEscU1(s *Scanner, c byte) Event {
 	if isHex(c) {
-		s.state = scanInStringEscU12
+		s.state = afterEscU12
 		return None
 	}
 
 	return s.errorf("TODO")
 }
 
-func scanInStringEscU12(s *Scanner, c byte) Event {
+func afterEscU12(s *Scanner, c byte) Event {
 	if isHex(c) {
-		s.state = scanInStringEscU123
+		s.state = afterEscU123
 		return None
 	}
 
 	return s.errorf("TODO")
 }
 
-func scanInStringEscU123(s *Scanner, c byte) Event {
+func afterEscU123(s *Scanner, c byte) Event {
 	if isHex(c) {
-		s.state = scanInString
+		s.state = afterQuote
 		return None
 	}
 
 	return s.errorf("TODO")
 }
 
-func scanNeg(s *Scanner, c byte) Event {
+func afterMinus(s *Scanner, c byte) Event {
 	if c == '0' {
-		s.state = scanZero
+		s.state = afterZero
 		return None
 	} else if '1' <= c && c <= '9' {
-		s.state = scanDigit
+		s.state = afterDigit
 		return None
 	}
 
 	return s.errorf("TODO")
 }
 
-func scanZero(s *Scanner, c byte) Event {
+func afterZero(s *Scanner, c byte) Event {
 	if c == '.' {
-		s.state = scanDot
+		s.state = afterDot
 		return None
 	} else if c == 'e' || c == 'E' {
-		s.state = scanE
+		s.state = afterE
 		return None
 	}
 
 	return s.next(c) | NumberEnd
 }
 
-func scanDigit(s *Scanner, c byte) Event {
+func afterDigit(s *Scanner, c byte) Event {
 	if isDigit(c) {
 		return None
 	}
 
-	return scanZero(s, c)
+	return afterZero(s, c)
 }
 
-func scanDot(s *Scanner, c byte) Event {
+func afterDot(s *Scanner, c byte) Event {
 	if isDigit(c) {
-		s.state = scanDotDigit
+		s.state = afterDotDigit
 		return None
 	}
 
 	return s.errorf("TODO")
 }
 
-func scanDotDigit(s *Scanner, c byte) Event {
+func afterDotDigit(s *Scanner, c byte) Event {
 	if isDigit(c) {
 		return None
 	} else if c == 'e' || c == 'E' {
-		s.state = scanE
+		s.state = afterE
 		return None
 	}
 
 	return s.next(c) | NumberEnd
 }
 
-func scanE(s *Scanner, c byte) Event {
+func afterE(s *Scanner, c byte) Event {
 	if isDigit(c) {
-		s.state = scanEDigit
+		s.state = afterEDigit
 		return None
 	} else if c == '-' || c == '+' {
-		s.state = scanESign
+		s.state = afterESign
 		return None
 	}
 
 	return s.errorf("TODO")
 }
 
-func scanESign(s *Scanner, c byte) Event {
+func afterESign(s *Scanner, c byte) Event {
 	if isDigit(c) {
-		s.state = scanEDigit
+		s.state = afterEDigit
 		return None
 	}
 
 	return s.errorf("TODO")
 }
 
-func scanEDigit(s *Scanner, c byte) Event {
+func afterEDigit(s *Scanner, c byte) Event {
 	if isDigit(c) {
 		return None
 	}
@@ -338,25 +340,25 @@ func scanEDigit(s *Scanner, c byte) Event {
 	return s.next(c) | NumberEnd
 }
 
-func scanT(s *Scanner, c byte) Event {
+func afterT(s *Scanner, c byte) Event {
 	if c == 'r' {
-		s.state = scanTr
+		s.state = afterTr
 		return None
 	}
 
 	return s.errorf("TODO")
 }
 
-func scanTr(s *Scanner, c byte) Event {
+func afterTr(s *Scanner, c byte) Event {
 	if c == 'u' {
-		s.state = scanTru
+		s.state = afterTru
 		return None
 	}
 
 	return s.errorf("TODO")
 }
 
-func scanTru(s *Scanner, c byte) Event {
+func afterTru(s *Scanner, c byte) Event {
 	if c == 'e' {
 		return s.delay(BoolEnd)
 	}
@@ -364,34 +366,34 @@ func scanTru(s *Scanner, c byte) Event {
 	return s.errorf("TODO")
 }
 
-func scanF(s *Scanner, c byte) Event {
+func afterF(s *Scanner, c byte) Event {
 	if c == 'a' {
-		s.state = scanFa
+		s.state = afterFa
 		return None
 	}
 
 	return s.errorf("TODO")
 }
 
-func scanFa(s *Scanner, c byte) Event {
+func afterFa(s *Scanner, c byte) Event {
 	if c == 'l' {
-		s.state = scanFal
+		s.state = afterFal
 		return None
 	}
 
 	return s.errorf("TODO")
 }
 
-func scanFal(s *Scanner, c byte) Event {
+func afterFal(s *Scanner, c byte) Event {
 	if c == 's' {
-		s.state = scanFals
+		s.state = afterFals
 		return None
 	}
 
 	return s.errorf("TODO")
 }
 
-func scanFals(s *Scanner, c byte) Event {
+func afterFals(s *Scanner, c byte) Event {
 	if c == 'e' {
 		return s.delay(BoolEnd)
 	}
@@ -399,25 +401,25 @@ func scanFals(s *Scanner, c byte) Event {
 	return s.errorf("TODO")
 }
 
-func scanN(s *Scanner, c byte) Event {
+func afterN(s *Scanner, c byte) Event {
 	if c == 'u' {
-		s.state = scanNu
+		s.state = afterNu
 		return None
 	}
 
 	return s.errorf("TODO")
 }
 
-func scanNu(s *Scanner, c byte) Event {
+func afterNu(s *Scanner, c byte) Event {
 	if c == 'l' {
-		s.state = scanNul
+		s.state = afterNul
 		return None
 	}
 
 	return s.errorf("TODO")
 }
 
-func scanNul(s *Scanner, c byte) Event {
+func afterNul(s *Scanner, c byte) Event {
 	if c == 'l' {
 		return s.delay(NullEnd)
 	}
@@ -425,11 +427,11 @@ func scanNul(s *Scanner, c byte) Event {
 	return s.errorf("TODO")
 }
 
-func scanDelay(s *Scanner, c byte) Event {
+func delayed(s *Scanner, c byte) Event {
 	return s.next(c) | s.end
 }
 
-func scanEnd(s *Scanner, c byte) Event {
+func afterTopValue(s *Scanner, c byte) Event {
 	if isSpace(c) {
 		return Space
 	}
@@ -437,7 +439,7 @@ func scanEnd(s *Scanner, c byte) Event {
 	return s.errorf("TODO")
 }
 
-func scanError(s *Scanner, c byte) Event {
+func afterError(s *Scanner, c byte) Event {
 	return Error
 }
 
