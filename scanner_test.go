@@ -9,6 +9,53 @@ var scannerTests = []struct {
 	out []Event
 }{
 	{
+		` [ ] `,
+		[]Event{
+			Space,            // ' '
+			ArrayStart,       // '['
+			Space,            // ' '
+			None,             // ']'
+			ArrayEnd | Space, // ' '
+			None,             // EOF
+		},
+	},
+	{
+		`[[],[[]]]`,
+		[]Event{
+			ArrayStart, // '['
+			ArrayStart, // '['
+			None,       // ']'
+			ArrayEnd,   // ','
+			ArrayStart, // '['
+			ArrayStart, // '['
+			None,       // ']'
+			ArrayEnd,   // ']'
+			ArrayEnd,   // ']'
+			ArrayEnd,   // EOF
+		},
+	},
+	{
+		`[0,1, 2 ,3 , 4]`,
+		[]Event{
+			ArrayStart,        // '['
+			NumberStart,       // '0'
+			NumberEnd,         // ','
+			NumberStart,       // '1'
+			NumberEnd,         // ','
+			Space,             // ' '
+			NumberStart,       // '2'
+			NumberEnd | Space, // ' '
+			None,              // ','
+			NumberStart,       // '3'
+			NumberEnd | Space, // ' '
+			None,              // ','
+			Space,             // ' '
+			NumberStart,       // '4'
+			NumberEnd,         // ']'
+			ArrayEnd,          // EOF
+		},
+	},
+	{
 		`"foo"`,
 		[]Event{
 			StringStart, // '"'

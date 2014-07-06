@@ -101,7 +101,8 @@ func scanValue(s *Scanner, c byte) Event {
 	} else if c == '{' {
 		// TODO
 	} else if c == '[' {
-		// TODO
+		s.scan = scanArray
+		return ArrayStart
 	} else if c == 't' {
 		s.scan = scanT
 		return BoolStart
@@ -111,6 +112,35 @@ func scanValue(s *Scanner, c byte) Event {
 	} else if c == 'n' {
 		s.scan = scanN
 		return NullStart
+	}
+
+	return s.errorf("TODO")
+}
+
+func scanArray(s *Scanner, c byte) Event {
+	if isSpace(c) {
+		return Space
+	} else if c == ']' {
+		s.scan = scanDelay
+		s.end = ArrayEnd
+		return None
+	}
+
+	s.push(scanElement)
+	return scanValue(s, c)
+}
+
+func scanElement(s *Scanner, c byte) Event {
+	if isSpace(c) {
+		return Space
+	} else if c == ',' {
+		s.scan = scanValue
+		s.push(scanElement)
+		return None
+	} else if c == ']' {
+		s.scan = scanDelay
+		s.end = ArrayEnd
+		return None
 	}
 
 	return s.errorf("TODO")
