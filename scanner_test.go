@@ -265,6 +265,290 @@ var scannerTests = []struct {
 			NullEnd,   // EOF
 		},
 	},
+	{
+		`x`,
+		[]Event{
+			Error, // 'x'
+		},
+	},
+	{
+		` `,
+		[]Event{
+			Space, // ' '
+			Error, // EOF
+		},
+	},
+	{
+		` 0 9`,
+		[]Event{
+			Space,             // ' '
+			NumberStart,       // '0'
+			NumberEnd | Space, // ' '
+			Error,             // '9'
+		},
+	},
+	{
+		`{ : "foo" }`,
+		[]Event{
+			ObjectStart, // '{'
+			Space,       // ' '
+			Error,       // ':'
+		},
+	},
+	{
+		`{ "foo" "bar" }`,
+		[]Event{
+			ObjectStart,    // '{'
+			Space,          // ' '
+			KeyStart,       // '"'
+			None,           // 'f'
+			None,           // 'o'
+			None,           // 'o'
+			None,           // '"'
+			KeyEnd | Space, // ' '
+			Error,          // '"'
+		},
+	},
+	{
+		`{ "foo": }`,
+		[]Event{
+			ObjectStart, // '{'
+			Space,       // ' '
+			KeyStart,    // '"'
+			None,        // 'f'
+			None,        // 'o'
+			None,        // 'o'
+			None,        // '"'
+			KeyEnd,      // ':'
+			Space,       // ' '
+			Error,       // '}'
+		},
+	},
+	{
+		`{ "foo": true false }`,
+		[]Event{
+			ObjectStart,     // '{'
+			Space,           // ' '
+			KeyStart,        // '"'
+			None,            // 'f'
+			None,            // 'o'
+			None,            // 'o'
+			None,            // '"'
+			KeyEnd,          // ':'
+			Space,           // ' '
+			BoolStart,       // 't'
+			None,            // 'r'
+			None,            // 'u'
+			None,            // 'e'
+			BoolEnd | Space, // ' '
+			Error,           // 'f'
+		},
+	},
+	{
+		`{ "foo": true, }`,
+		[]Event{
+			ObjectStart, // '{'
+			Space,       // ' '
+			KeyStart,    // '"'
+			None,        // 'f'
+			None,        // 'o'
+			None,        // 'o'
+			None,        // '"'
+			KeyEnd,      // ':'
+			Space,       // ' '
+			BoolStart,   // 't'
+			None,        // 'r'
+			None,        // 'u'
+			None,        // 'e'
+			BoolEnd,     // ','
+			Space,       // ' '
+			Error,       // '}'
+		},
+	},
+	{
+		`[1 2]`,
+		[]Event{
+			ArrayStart,        // '['
+			NumberStart,       // '1'
+			NumberEnd | Space, // ' '
+			Error,             // '2'
+		},
+	},
+	{
+		"\"\t\"",
+		[]Event{
+			StringStart, // '"'
+			Error,       // '\t'
+		},
+	},
+	{
+		`"\U1234"`,
+		[]Event{
+			StringStart, // '"'
+			None,        // '\\'
+			Error,       // 'U'
+		},
+	},
+	{
+		`"\ux"`,
+		[]Event{
+			StringStart, // '"'
+			None,        // '\\'
+			None,        // 'u'
+			Error,       // 'x'
+		},
+	},
+	{
+		`"\u1x"`,
+		[]Event{
+			StringStart, // '"'
+			None,        // '\\'
+			None,        // 'u'
+			None,        // '1'
+			Error,       // 'x'
+		},
+	},
+	{
+		`"\u12x"`,
+		[]Event{
+			StringStart, // '"'
+			None,        // '\\'
+			None,        // 'u'
+			None,        // '1'
+			None,        // '2'
+			Error,       // 'x'
+		},
+	},
+	{
+		`"\u123x"`,
+		[]Event{
+			StringStart, // '"'
+			None,        // '\\'
+			None,        // 'u'
+			None,        // '1'
+			None,        // '2'
+			None,        // '3'
+			Error,       // 'x'
+		},
+	},
+	{
+		`-.5`,
+		[]Event{
+			NumberStart, // '-'
+			Error,       // '.'
+		},
+	},
+	{
+		`0. `,
+		[]Event{
+			NumberStart, // '0'
+			None,        // '.'
+			Error,       // ' '
+		},
+	},
+	{
+		`0.0e`,
+		[]Event{
+			NumberStart, // '0'
+			None,        // '.'
+			None,        // '0'
+			None,        // 'e'
+			Error,       // EOF
+		},
+	},
+	{
+		`0.0e+ `,
+		[]Event{
+			NumberStart, // '0'
+			None,        // '.'
+			None,        // '0'
+			None,        // 'e'
+			None,        // '+'
+			Error,       // ' '
+		},
+	},
+	{
+		`tx`,
+		[]Event{
+			BoolStart, // 't'
+			Error,     // 'x'
+		},
+	},
+	{
+		`tr`,
+		[]Event{
+			BoolStart, // 't'
+			None,      // 'r'
+			Error,     // EOF
+		},
+	},
+	{
+		`truE`,
+		[]Event{
+			BoolStart, // 't'
+			None,      // 'r'
+			None,      // 'u'
+			Error,     // 'E'
+		},
+	},
+	{
+		`fx`,
+		[]Event{
+			BoolStart, // 'f'
+			Error,     // 'x'
+		},
+	},
+	{
+		`faL`,
+		[]Event{
+			BoolStart, // 'f'
+			None,      // 'a'
+			Error,     // 'L'
+		},
+	},
+	{
+		`falx`,
+		[]Event{
+			BoolStart, // 'f'
+			None,      // 'a'
+			None,      // 'l'
+			Error,     // 'x'
+		},
+	},
+	{
+		`fals`,
+		[]Event{
+			BoolStart, // 'f'
+			None,      // 'a'
+			None,      // 'l'
+			None,      // 's'
+			Error,     // EOF
+		},
+	},
+	{
+		`nU`,
+		[]Event{
+			NullStart, // 'n'
+			Error,     // 'U'
+		},
+	},
+	{
+		`nuL`,
+		[]Event{
+			NullStart, // 'n'
+			None,      // 'u'
+			Error,     // 'L'
+		},
+	},
+	{
+		`nul `,
+		[]Event{
+			NullStart, // 'n'
+			None,      // 'u'
+			None,      // 'l'
+			Error,     // ' '
+		},
+	},
 }
 
 func TestScanner(t *testing.T) {
