@@ -9,6 +9,42 @@ var scannerTests = []struct {
 	out []Event
 }{
 	{
+		` { } `,
+		[]Event{
+			Space,             // ' '
+			ObjectStart,       // '{'
+			Space,             // ' '
+			None,              // '}'
+			ObjectEnd | Space, // ' '
+			None,              // EOF
+		},
+	},
+	{
+		`{ "a": { "b":{} } }`,
+		[]Event{
+			ObjectStart,       // '{'
+			Space,             // ' '
+			KeyStart,          // '"'
+			None,              // 'a'
+			None,              // '"'
+			KeyEnd,            // ':'
+			Space,             // ' '
+			ObjectStart,       // '{'
+			Space,             // ' '
+			KeyStart,          // '"'
+			None,              // 'b'
+			None,              // '"'
+			KeyEnd,            // ':'
+			ObjectStart,       // '{'
+			None,              // '}'
+			ObjectEnd | Space, // ' '
+			None,              // '}'
+			ObjectEnd | Space, // ' '
+			None,              // '}'
+			ObjectEnd,         // EOF
+		},
+	},
+	{
 		` [ ] `,
 		[]Event{
 			Space,            // ' '
