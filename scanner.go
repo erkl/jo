@@ -95,7 +95,7 @@ func beforeValue(s *Scanner, c byte) Event {
 		if c >= '1' {
 			s.state = afterDigit
 			return NumberStart
-		} else if isSpace(c) {
+		} else if table[c]&isSpace != 0 {
 			return Space
 		} else if c == '"' {
 			s.state = afterQuote
@@ -129,7 +129,7 @@ func beforeValue(s *Scanner, c byte) Event {
 }
 
 func beforeFirstObjectKey(s *Scanner, c byte) Event {
-	if isSpace(c) {
+	if table[c]&isSpace != 0 {
 		return Space
 	} else if c == '"' {
 		s.state = afterQuote
@@ -144,7 +144,7 @@ func beforeFirstObjectKey(s *Scanner, c byte) Event {
 }
 
 func afterObjectKey(s *Scanner, c byte) Event {
-	if isSpace(c) {
+	if table[c]&isSpace != 0 {
 		return Space
 	} else if c == ':' {
 		s.state = beforeValue
@@ -156,7 +156,7 @@ func afterObjectKey(s *Scanner, c byte) Event {
 }
 
 func afterObjectValue(s *Scanner, c byte) Event {
-	if isSpace(c) {
+	if table[c]&isSpace != 0 {
 		return Space
 	} else if c == ',' {
 		s.state = afterObjectComma
@@ -169,7 +169,7 @@ func afterObjectValue(s *Scanner, c byte) Event {
 }
 
 func afterObjectComma(s *Scanner, c byte) Event {
-	if isSpace(c) {
+	if table[c]&isSpace != 0 {
 		return Space
 	} else if c == '"' {
 		s.state = afterQuote
@@ -182,7 +182,7 @@ func afterObjectComma(s *Scanner, c byte) Event {
 }
 
 func beforeFirstArrayElement(s *Scanner, c byte) Event {
-	if isSpace(c) {
+	if table[c]&isSpace != 0 {
 		return Space
 	} else if c == ']' {
 		return s.delay(ArrayEnd)
@@ -193,7 +193,7 @@ func beforeFirstArrayElement(s *Scanner, c byte) Event {
 }
 
 func afterArrayElement(s *Scanner, c byte) Event {
-	if isSpace(c) {
+	if table[c]&isSpace != 0 {
 		return Space
 	} else if c == ',' {
 		s.state = beforeValue
@@ -223,7 +223,7 @@ func afterQuote(s *Scanner, c byte) Event {
 }
 
 func afterEsc(s *Scanner, c byte) Event {
-	if isEsc(c) {
+	if table[c]&isEsc != 0 {
 		s.state = afterQuote
 		return None
 	} else if c == 'u' {
@@ -235,7 +235,7 @@ func afterEsc(s *Scanner, c byte) Event {
 }
 
 func afterEscU(s *Scanner, c byte) Event {
-	if isHex(c) {
+	if table[c]&isHex != 0 {
 		s.state = afterEscU1
 		return None
 	}
@@ -244,7 +244,7 @@ func afterEscU(s *Scanner, c byte) Event {
 }
 
 func afterEscU1(s *Scanner, c byte) Event {
-	if isHex(c) {
+	if table[c]&isHex != 0 {
 		s.state = afterEscU12
 		return None
 	}
@@ -253,7 +253,7 @@ func afterEscU1(s *Scanner, c byte) Event {
 }
 
 func afterEscU12(s *Scanner, c byte) Event {
-	if isHex(c) {
+	if table[c]&isHex != 0 {
 		s.state = afterEscU123
 		return None
 	}
@@ -262,7 +262,7 @@ func afterEscU12(s *Scanner, c byte) Event {
 }
 
 func afterEscU123(s *Scanner, c byte) Event {
-	if isHex(c) {
+	if table[c]&isHex != 0 {
 		s.state = afterQuote
 		return None
 	}
@@ -295,7 +295,7 @@ func afterZero(s *Scanner, c byte) Event {
 }
 
 func afterDigit(s *Scanner, c byte) Event {
-	if isDigit(c) {
+	if table[c]&isDigit != 0 {
 		return None
 	}
 
@@ -303,7 +303,7 @@ func afterDigit(s *Scanner, c byte) Event {
 }
 
 func afterDot(s *Scanner, c byte) Event {
-	if isDigit(c) {
+	if table[c]&isDigit != 0 {
 		s.state = afterDotDigit
 		return None
 	}
@@ -312,7 +312,7 @@ func afterDot(s *Scanner, c byte) Event {
 }
 
 func afterDotDigit(s *Scanner, c byte) Event {
-	if isDigit(c) {
+	if table[c]&isDigit != 0 {
 		return None
 	} else if c == 'e' || c == 'E' {
 		s.state = afterE
@@ -323,7 +323,7 @@ func afterDotDigit(s *Scanner, c byte) Event {
 }
 
 func afterE(s *Scanner, c byte) Event {
-	if isDigit(c) {
+	if table[c]&isDigit != 0 {
 		s.state = afterEDigit
 		return None
 	} else if c == '-' || c == '+' {
@@ -335,7 +335,7 @@ func afterE(s *Scanner, c byte) Event {
 }
 
 func afterESign(s *Scanner, c byte) Event {
-	if isDigit(c) {
+	if table[c]&isDigit != 0 {
 		s.state = afterEDigit
 		return None
 	}
@@ -344,7 +344,7 @@ func afterESign(s *Scanner, c byte) Event {
 }
 
 func afterEDigit(s *Scanner, c byte) Event {
-	if isDigit(c) {
+	if table[c]&isDigit != 0 {
 		return None
 	}
 
@@ -443,7 +443,7 @@ func delayed(s *Scanner, c byte) Event {
 }
 
 func afterTopValue(s *Scanner, c byte) Event {
-	if isSpace(c) {
+	if table[c]&isSpace != 0 {
 		return Space
 	}
 
@@ -454,23 +454,32 @@ func afterError(s *Scanner, c byte) Event {
 	return Error
 }
 
-// isSpace returns true if c is a whitespace character.
-func isSpace(c byte) bool {
-	return c == ' ' || c == '\t' || c == '\r' || c == '\n'
-}
+// Character type lookup table.
+var table = [256]byte{}
 
-// isDigit returns true if c is a valid decimal digit.
-func isDigit(c byte) bool {
-	return '0' <= c && c <= '9'
-}
+const (
+	isSpace = 1 << iota
+	isDigit
+	isHex
+	isEsc
+)
 
-// isHex returns true if c is a valid hexadecimal digit.
-func isHex(c byte) bool {
-	return '0' <= c && c <= '9' || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F'
-}
+func init() {
+	for i := 0; i < 256; i++ {
+		c := byte(i)
 
-// isEsc returns true if `\` + c is a valid escape sequence.
-func isEsc(c byte) bool {
-	return c == 'b' || c == 'f' || c == 'n' || c == 'r' || c == 't' ||
-		c == '\\' || c == '/' || c == '"'
+		if c == ' ' || c == '\n' || c == '\t' || c == '\r' {
+			table[i] |= isSpace
+		}
+		if '0' <= c && c <= '9' {
+			table[i] |= isDigit
+		}
+		if '0' <= c && c <= '9' || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F' {
+			table[i] |= isHex
+		}
+		if c == 'b' || c == 'f' || c == 'n' || c == 'r' || c == 't' ||
+			c == '\\' || c == '/' || c == '"' {
+			table[i] |= isEsc
+		}
+	}
 }
