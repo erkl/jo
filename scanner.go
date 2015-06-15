@@ -208,7 +208,7 @@ func afterArrayElement(s *Scanner, c byte) Event {
 
 func afterQuote(s *Scanner, c byte) Event {
 	if c == '"' {
-		// At thie point, s.end has already been set to either StringEnd or
+		// At this point, s.end has already been set to either StringEnd or
 		// KeyEnd depending on the previous state function.
 		s.state = delayed
 		return None
