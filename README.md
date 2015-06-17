@@ -54,3 +54,7 @@ func minify(dst io.Writer, src io.Reader) error {
 	return nil
 }
 ```
+
+##### License
+
+ISC.
