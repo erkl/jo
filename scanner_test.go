@@ -1,8 +1,35 @@
 package jo
 
 import (
+	"fmt"
 	"testing"
 )
+
+func ExampleScanner() {
+	var s = NewScanner()
+
+	for _, c := range `{ "foo": 123 }` {
+		fmt.Printf("at %q: %s\n", c, s.Scan(byte(c)))
+	}
+
+	fmt.Printf("at EOF: %s\n", s.End())
+	// Output:
+	// at '{': ObjectStart
+	// at ' ': Space
+	// at '"': KeyStart
+	// at 'f': None
+	// at 'o': None
+	// at 'o': None
+	// at '"': None
+	// at ':': KeyEnd
+	// at ' ': Space
+	// at '1': NumberStart
+	// at '2': None
+	// at '3': None
+	// at ' ': NumberEnd | Space
+	// at '}': None
+	// at EOF: ObjectEnd
+}
 
 var scannerTests = []struct {
 	in  string
