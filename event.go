@@ -17,22 +17,26 @@ const (
 	// Same as None, but specifically for whitespace.
 	Space = (1 << iota)
 
-	// Start events.
+	// Start and end events.
 	ObjectStart = (1 << iota)
-	KeyStart
-	ArrayStart
-	StringStart
-	NumberStart
-	BoolStart
-	NullStart
+	ObjectEnd
 
-	// End events.
-	ObjectEnd = (1 << iota)
+	KeyStart
 	KeyEnd
+
+	ArrayStart
 	ArrayEnd
+
+	StringStart
 	StringEnd
+
+	NumberStart
 	NumberEnd
+
+	BoolStart
 	BoolEnd
+
+	NullStart
 	NullEnd
 
 	// Start and end bitsets.
