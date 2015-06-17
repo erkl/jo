@@ -4,8 +4,8 @@ import (
 	"fmt"
 )
 
-// A Scanner is a state machine which emits a series of Events when fed JSON
-// input.
+// A Scanner is a state machine which eats input, one byte at a time,
+// and produces scanning events as output.
 type Scanner struct {
 	// Current state.
 	state func(*Scanner, byte) Event
@@ -42,8 +42,8 @@ func (s *Scanner) Scan(c byte) Event {
 // End signals the Scanner that the end of input has been reached. It returns
 // an event just as Scan does.
 func (s *Scanner) End() Event {
-	// Feeding the state function whitespace will for NumberEnd events.
-	// Note the bitwise operation to filter out the Space bit.
+	// Feeding the state function whitespace may trigger NumberEnd events.
+	// Note the mask operation to filter out the actual Space bit.
 	ev := s.state(s, ' ') & (^Space)
 
 	if s.err != nil {
