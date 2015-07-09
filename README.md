@@ -1,11 +1,12 @@
-**jo** provides a high-performance JSON scanner in Go.
+Package **jo** provides a simple, high-performance JSON scanner for Go. Why?
+Because the lowest level parsing functionality provided by the standard library
+is the `encoding/json` package's `json.Unmarshal` function, which is clearly
+too high level for many use cases.
 
-Why? Because the lowest-level JSON parsing primitive provided by the Go
-standard library is `json.Unmarshal`ing a byte slice into an `interface{}`
-value and inspecting it using runtime reflection... and then crying in the
-shower until the pain goes away.
 
-##### Example
+#### Example
+
+Below is a function which minifies raw JSON while it's being copied.
 
 ```go
 func minify(dst io.Writer, src io.Reader) error {
@@ -23,7 +24,7 @@ func minify(dst io.Writer, src io.Reader) error {
 			return err
 		}
 
-		// Minify the buffer in-place.
+		// Minify the buffer in place.
 		for r, w = 0, 0; r < n; r++ {
 			ev := s.Scan(buf[r])
 
@@ -33,10 +34,12 @@ func minify(dst io.Writer, src io.Reader) error {
 			}
 
 			// Ignore whitespace characters.
-			if ev&jo.Space == 0 {
-				buf[w] = buf[r]
-				w++
+			if ev&jo.Space != 0 {
+				continue
 			}
+
+			buf[w] = buf[r]
+			w++
 		}
 
 		// Write the now compressed buffer.
@@ -55,7 +58,8 @@ func minify(dst io.Writer, src io.Reader) error {
 }
 ```
 
-##### License
+
+#### License
 
 ```
 Copyright (c) 2015, Erik Lundin.
